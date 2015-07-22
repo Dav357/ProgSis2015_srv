@@ -1,0 +1,15 @@
+//============================================================================
+// Name        : ProgSis2015_srv.cpp
+// Author      : Davide
+// Version     :
+// Copyright   : 
+// Description : Hello World in C++, Ansi-style
+//============================================================================
+
+#include <iostream>
+using namespace std;
+
+int main() {
+	cout << "!!!Hello World!!!" << endl; // prints !!!Hello World!!!
+	return 0;
+}
