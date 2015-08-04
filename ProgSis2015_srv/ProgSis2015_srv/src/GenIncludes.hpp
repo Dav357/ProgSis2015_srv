@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <string>
 #include <string.h>
+#include <sys/socket.h>
 
 #include "LoginServ.hpp"
 #include "SQLiteCpp/SQLiteCpp.h"

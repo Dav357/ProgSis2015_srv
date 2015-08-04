@@ -14,7 +14,7 @@
 #define COMM_LEN 8
 
 bool login(int);
-bool account_manag(std::string usr, std::string shapass, int flag);
+int account_manag(std::string usr, std::string shapass, int flag);
 
 
 #endif /* LOGINSERV_HPP_ */
