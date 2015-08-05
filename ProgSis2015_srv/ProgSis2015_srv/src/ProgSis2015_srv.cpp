@@ -7,6 +7,7 @@
 //============================================================================
 #include "GenIncludes.hpp"
 
+#include <map>
 #include <sys/stat.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -18,6 +19,12 @@
 
 using namespace std;
 
+enum StringValue {
+	Undefined, Select_folder, Clear_folder, Logout
+};
+
+static map<string, StringValue> m_CommandsValues;
+
 void terminate_handler() {
 	cerr << "Chiusura forzata processo\n";
 	exit(-1);
@@ -28,6 +35,7 @@ void clear_cstr(char *toclear, int len) {
 }
 
 void server_function(int, int);
+static void Initialize();
 
 int main(int argc, char** argv) {
 
@@ -36,6 +44,8 @@ int main(int argc, char** argv) {
 	socklen_t claddr_len = sizeof(struct sockaddr_in);
 	int s, s_c; //Socket
 	MD5 md5;
+
+	Initialize();
 
 	//SQLite::Database db("provabd.db3", SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE);
 
@@ -75,7 +85,8 @@ int main(int argc, char** argv) {
 		/* Ogni figlio riceve una connessione -> differ. per PID*/
 		s_c = accept(s, (struct sockaddr *) &claddr, &claddr_len);
 		pid = getpid();
-		cout << "- [" << pid << "] Connesso all'host: " << inet_ntoa(claddr.sin_addr) << endl;
+		cout << "- [" << pid << "] Connesso all'host: "
+				<< inet_ntoa(claddr.sin_addr) << endl;
 		cout << "- [" << pid << "] In attesa di comandi" << endl;
 		server_function(s_c, pid);
 	}
@@ -84,21 +95,58 @@ int main(int argc, char** argv) {
 	return 0;
 }
 
+void Initialize() {
+	string s = "SET_FOLD";
+	m_CommandsValues[s] = Select_folder;
+	s = "CLR_FOLD";
+	m_CommandsValues[s] = Clear_folder;
+	s = "LOGOUT__";
+	m_CommandsValues[s] = Logout;
+	/* DEBUG*/ cout << "m_CommandsValues contiene " << m_CommandsValues.size() << " elementi." << endl;
+}
+
 // Funzione di gestione operazioni del server
 void server_function(int s_c, int pid) {
 
-	char buffer[MAX_BUF_LEN] = "";
+	Account ac;
+	Folder f;
+	int len;
+	char buffer[MAX_BUF_LEN+1] = "", comm[COMM_LEN+1] = "";
 
 	// Prima oprerazione: login;
 	strcpy(buffer, "Inserire dati utente o richiesta nuovo account");
 	send(s_c, buffer, strlen(buffer), 0);
-	if (!login(s_c)) {
-		cerr << "- [" << pid << "] Errore nella procedura di autenticazione" << endl;
+	if (!((ac = login(s_c)).is_complete())) {
+		cerr << "- [" << pid << "] Errore nella procedura di autenticazione"
+				<< endl;
+		cerr << "- [" << pid << "] Chiusura connessione" << endl;
 		close(s_c);
 		return;
 		///* DEBUG */exit(-1);
 	}
 
-	getchar();
+	// Attesa comando dal client
+	cout << "- [" << pid << "] In attesa di comandi dal client" << endl;
+	len = recv(s_c, comm, COMM_LEN, 0);
+
+	///* DEBUG */cout << comm << endl;
+	///* DEBUG */cout << m_CommandsValues[comm] << endl;
+	switch (m_CommandsValues[comm]) {
+	case Select_folder:
+		cout << "- [" << pid << "] Ricevuto comando 'seleziona cartella'" << endl;
+		cout << "- [" << pid << "] In attesa del percorso" << endl;
+		f = select_folder(s_c, ac.getUser());
+		break;
+	case Clear_folder:
+		f.clear_folder();
+		break;
+	case Logout:
+		ac.clear();
+		return;
+		break;
+	default:
+		break;
+	}
+
 	return;
 }

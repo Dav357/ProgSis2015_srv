@@ -16,6 +16,7 @@
 #include <sys/socket.h>
 
 #include "LoginServ.hpp"
+#include "Folder.h"
 #include "SQLiteCpp/SQLiteCpp.h"
 
 
