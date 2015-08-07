@@ -20,7 +20,7 @@
 using namespace std;
 
 enum StringValue {
-	Undefined, Select_folder, Clear_folder, Logout
+	Undefined, Select_folder, Clear_folder, Receive_file, Logout
 };
 
 static map<string, StringValue> m_CommandsValues;
@@ -30,12 +30,16 @@ void terminate_handler() {
 	exit(-1);
 }
 
-void clear_cstr(char *toclear, int len) {
-	memset(toclear, '\0', len);
+void server_function(int, int);
+static void Initialize() {
+	m_CommandsValues["SET_FOLD"] = Select_folder;
+	m_CommandsValues["CLR_FOLD"] = Clear_folder;
+	m_CommandsValues["REC_FILE"] = Receive_file;
+	m_CommandsValues["LOGOUT__"] = Logout;
+	///* DEBUG*/cout << "m_CommandsValues contiene " << m_CommandsValues.size() << " elementi." << endl;
 }
 
-void server_function(int, int);
-static void Initialize();
+
 
 int main(int argc, char** argv) {
 
@@ -58,8 +62,7 @@ int main(int argc, char** argv) {
 
 	// Creazione socket
 	if ((s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
-		cerr << "- Errore nella crezione del socket, chiusura programma"
-				<< endl;
+		cerr << "- Errore nella crezione del socket, chiusura programma" << endl;
 		return -1;
 	};
 	saddr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -72,9 +75,7 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 	if (listen(s, BKLOG) == -1) {
-		cerr
-				<< "- Errore nell'operazione di ascolto sul socket, chiusura programma"
-				<< endl;
+		cerr << "- Errore nell'operazione di ascolto sul socket, chiusura programma" << endl;
 		return -1;
 	}
 
@@ -85,8 +86,7 @@ int main(int argc, char** argv) {
 		/* Ogni figlio riceve una connessione -> differ. per PID*/
 		s_c = accept(s, (struct sockaddr *) &claddr, &claddr_len);
 		pid = getpid();
-		cout << "- [" << pid << "] Connesso all'host: "
-				<< inet_ntoa(claddr.sin_addr) << endl;
+		cout << "- [" << pid << "] Connesso all'host: " << inet_ntoa(claddr.sin_addr) << endl;
 		cout << "- [" << pid << "] In attesa di comandi" << endl;
 		server_function(s_c, pid);
 	}
@@ -95,58 +95,69 @@ int main(int argc, char** argv) {
 	return 0;
 }
 
-void Initialize() {
-	string s = "SET_FOLD";
-	m_CommandsValues[s] = Select_folder;
-	s = "CLR_FOLD";
-	m_CommandsValues[s] = Clear_folder;
-	s = "LOGOUT__";
-	m_CommandsValues[s] = Logout;
-	/* DEBUG*/ cout << "m_CommandsValues contiene " << m_CommandsValues.size() << " elementi." << endl;
-}
-
 // Funzione di gestione operazioni del server
 void server_function(int s_c, int pid) {
 
 	Account ac;
 	Folder f;
 	int len;
-	char buffer[MAX_BUF_LEN+1] = "", comm[COMM_LEN+1] = "";
+	char buffer[MAX_BUF_LEN + 1] = "", comm[COMM_LEN + 1] = "";
 
 	// Prima oprerazione: login;
 	strcpy(buffer, "Inserire dati utente o richiesta nuovo account");
 	send(s_c, buffer, strlen(buffer), 0);
 	if (!((ac = login(s_c)).is_complete())) {
-		cerr << "- [" << pid << "] Errore nella procedura di autenticazione"
-				<< endl;
+		cerr << "- [" << pid << "] Errore nella procedura di autenticazione" << endl;
 		cerr << "- [" << pid << "] Chiusura connessione" << endl;
 		close(s_c);
 		return;
 		///* DEBUG */exit(-1);
 	}
 
-	// Attesa comando dal client
-	cout << "- [" << pid << "] In attesa di comandi dal client" << endl;
-	len = recv(s_c, comm, COMM_LEN, 0);
+	while (ac.is_complete()) {
+		// Attesa comando dal client
+		cout << "- [" << pid << "] In attesa di comandi dal client" << endl;
+		len = recv(s_c, comm, COMM_LEN, 0);
 
-	///* DEBUG */cout << comm << endl;
-	///* DEBUG */cout << m_CommandsValues[comm] << endl;
-	switch (m_CommandsValues[comm]) {
-	case Select_folder:
-		cout << "- [" << pid << "] Ricevuto comando 'seleziona cartella'" << endl;
-		cout << "- [" << pid << "] In attesa del percorso" << endl;
-		f = select_folder(s_c, ac.getUser());
-		break;
-	case Clear_folder:
-		f.clear_folder();
-		break;
-	case Logout:
-		ac.clear();
-		return;
-		break;
-	default:
-		break;
+		///* DEBUG */cout << comm << endl;
+		///* DEBUG */cout << m_CommandsValues[comm] << endl;
+		switch (m_CommandsValues[comm]) {
+		case Select_folder:
+			comm[0] = '\0';
+			cout << "- [" << pid << "] Ricevuto comando 'seleziona cartella'" << endl;
+			cout << "- [" << pid << "] In attesa del percorso" << endl;
+			f = select_folder(s_c, ac.getUser());
+			cout << "- [" << pid << "] Cartella selezionata: " << f.getPath() << endl;
+			break;
+		case Clear_folder:
+			comm[0] = '\0';
+			cout << "- [" << pid << "] Ricevuto comando 'deseleziona cartella'" << endl;
+			f.clear_folder();
+			cout << "- [" << pid << "] Cartella deselezionata" << endl;
+			break;
+		case Receive_file:
+			comm[0] = '\0';
+			cout << "- [" << pid << "] Ricevuto comando 'ricevi file'" << endl;
+			cout << "- [" << pid << "] In attesa del file" << endl;
+			receive_file(s_c, f);
+			break;
+		case Logout:
+			comm[0] = '\0';
+			cout << "- [" << pid << "] Ricevuto comando 'logout'" << endl;
+			ac.clear();
+			return;
+			break;
+		default:
+			break;
+		}
 	}
 
 	return;
 }
+
+void send_command(int s_c, const char *command) {
+	char buffer[COMM_LEN + 1];
+	strcpy(buffer, command);
+	send(s_c, buffer, strlen(buffer), 0);
+}
+

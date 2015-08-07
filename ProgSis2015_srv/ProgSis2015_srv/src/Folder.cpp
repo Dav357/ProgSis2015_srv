@@ -10,19 +10,21 @@
 using namespace std;
 
 /* Metodi classe Folder */
-Folder::Folder(string p, string usr) {
+Folder::Folder(string p, string user) {
 
 	string tmp = "table_";
-	tmp.append(usr);
+	tmp.append(user);
 	tmp.append("_");
 	tmp.append(p);
 
 	path = p;
 	table_name = tmp;
+	this->user = user;
 }
 
-void Folder::clear_folder(){
-
+void Folder::clear_folder() {
+	path = "";
+	table_name = "";
 }
 /* Fine metodi classe Folder */
 
@@ -32,7 +34,6 @@ Folder select_folder(int s_c, string usr) {
 	int len;
 	char buffer[MAX_BUF_LEN] = "";
 	string path;
-	string table_name = "table_";
 
 	len = recv(s_c, buffer, MAX_BUF_LEN, 0);
 	buffer[len] = '\0';
@@ -44,11 +45,33 @@ Folder select_folder(int s_c, string usr) {
 	// Apertura DB (sola lettura)
 	Database db("database.db3");
 
-	if(db.tableExists(f.getTableName())){
-		/* DEBUG */cout << "Trovata tabella relativa alla cartella " << path << endl;
+	if (db.tableExists(f.getTableName())) {
+		///* DEBUG */cout << "Trovata tabella relativa alla cartella " << path << endl;
+
 	} else {
-		/* DEBUG */cout << "Tabella relativa alla cartella " << path << " non trovata" << endl;
+		///* DEBUG */cout << "Tabella relativa alla cartella " << path << " non trovata, creazione tabella" << endl;
+		create_table_folder(f);
 	}
 
+	send_command(s_c, "FOLDEROK");
 	return f;
 }
+
+bool create_table_folder(Folder f) {
+	using namespace SQLite;
+	Database db("database.db3", SQLITE_OPEN_READWRITE);
+	string _query("CREATE TABLE [");
+	_query.append(f.getTableName());
+	_query.append("] (File_ID INTEGER PRIMARY KEY AUTOINCREMENT, File_CL TEXT NOT NULL, Last_Modif INTEGER (8) NOT NULL,File_SRV TEXT  NOT NULL,  Hash STRING (32));");
+	Statement query(db, _query);
+
+	if (query.exec() == 0) {
+		/* DEBUG */cout << "Tabella " << f.getTableName() << " creata con successo" << endl;
+		return true;
+	} else {
+		/* DEBUG */cout << "Errore nella creazione della tabella " << f.getTableName() << endl;
+		return false;
+	}
+
+}
+

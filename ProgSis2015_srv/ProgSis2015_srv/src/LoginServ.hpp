@@ -14,6 +14,7 @@
 #define MAX_BUF_LEN 1024
 #define COMM_LEN 8
 
+
 class Account{
 	std::string usr;
 	std::string shapass;

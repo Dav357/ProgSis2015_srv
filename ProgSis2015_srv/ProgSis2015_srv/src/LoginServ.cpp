@@ -1,5 +1,6 @@
 #include "GenIncludes.hpp"
 
+
 using namespace std;
 
 /* Funzioni classe Account */
@@ -74,7 +75,7 @@ Account login(int s_c) {
 			// Ricezione "[username]\r\n[sha-256_password]\r\n"
 			len = read(s_c, buffer, MAX_BUF_LEN);
 			buffer[len] = '\0';
-			// Inserimento in stringhe di [username]...
+			// Inserimento in stringhe di username...
 			buf = strtok(buffer, "\r\n");
 			ac.assign_username(buf);
 			// ... e dell'SHA-256 della password
@@ -86,21 +87,18 @@ Account login(int s_c) {
 				flags = CREATEACC;
 			}
 			if (account_manag(ac, flags)) {
-				strcpy(buffer, "Accesso effettuato");
+				send_command(s_c, "LOGGEDOK");
 			} else {
-				strcpy(buffer, "Accesso non effettauto");
+				send_command(s_c, "LOGINERR");
 			}
-			send(s_c, buffer, strlen(buffer), 0);
 			return ac;
 		} else {
 			// Comando non riconosciuto
-			strcpy(buffer, "Comando non riconosciuto");
-			send(s_c, buffer, strlen(buffer), 0);
+			send_command(s_c, "UNKNOWN_");
 			return ac;
 		}
 	} catch (SQLite::Exception& e) {
-		strcpy(buffer, "Errore nell'accesso al database");
-		send(s_c, buffer, strlen(buffer), 0);
+		send_command(s_c, "DB_ERROR");
 		return ac;
 	}
 }
@@ -117,31 +115,29 @@ bool account_manag(Account& ac, int flags) {
 		///* DEBUG */cout << "SQLite table 'test' exists=" << bExists << endl;
 		if (flags == LOGIN) {
 			/* Login */
-			_query.assign(
-					"SELECT * FROM users WHERE username = ? AND sha2_pass = ?");
+			_query.assign("SELECT * FROM users WHERE username = ? AND sha2_pass = ?");
 		} else {
 			/* Creazione account */
-			_query.assign(
-					"INSERT INTO users (username, sha2_pass) VALUES (?, ?)");
+			_query.assign("INSERT INTO users (username, sha2_pass) VALUES (?, ?)");
 		}
 		Statement query(db, _query);
 		///* DEBUG */ cout << "SQLite statement '" << query.getQuery() << "' compiled (" << query.getColumnCount() << " columns in the result)" << endl;
 		ac.bind_to_query(query);
 		if (flags == LOGIN) {
 			if (query.executeStep()) {
-				cout << "Account trovato" << endl;
+				///* DEBUG */ cout << "Account trovato" << endl;
 				return true;
 			} else {
-				cerr << "Account non trovato" << endl;
+				///* DEBUG */ cerr << "Account non trovato" << endl;
 				ac.clear();
 				return false;
 			}
 		} else {
 			if (query.exec() == 1) {
-				cout << "Account creato con successo" << endl;
+				///* DEBUG */ cout << "Account creato con successo" << endl;
 				return true;
 			} else {
-				cerr << "Errore nella creazione dell'account" << endl;
+				///* DEBUG */cerr << "Errore nella creazione dell'account" << endl;
 				ac.clear();
 				return false;
 			}
@@ -153,9 +149,7 @@ bool account_manag(Account& ac, int flags) {
 
 }
 
-void logout(int s_c){
-
+void logout(int s_c) {
 
 }
-
 

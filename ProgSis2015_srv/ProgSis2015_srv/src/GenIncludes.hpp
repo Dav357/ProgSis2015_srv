@@ -17,8 +17,10 @@
 
 #include "LoginServ.hpp"
 #include "Folder.h"
+#include "File.h"
 #include "SQLiteCpp/SQLiteCpp.h"
 
+void send_command(int s_c, const char *command);
 
 
 #endif /* GENINCLUDES_HPP_ */
