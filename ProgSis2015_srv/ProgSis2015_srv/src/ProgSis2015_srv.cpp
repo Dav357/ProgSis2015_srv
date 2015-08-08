@@ -100,7 +100,6 @@ void server_function(int s_c, int pid) {
 
 	Account ac;
 	Folder f;
-	int len;
 	char buffer[MAX_BUF_LEN + 1] = "", comm[COMM_LEN + 1] = "";
 
 	// Prima oprerazione: login;
@@ -117,7 +116,7 @@ void server_function(int s_c, int pid) {
 	while (ac.is_complete()) {
 		// Attesa comando dal client
 		cout << "- [" << pid << "] In attesa di comandi dal client" << endl;
-		len = recv(s_c, comm, COMM_LEN, 0);
+		recv(s_c, comm, COMM_LEN, 0);
 
 		///* DEBUG */cout << comm << endl;
 		///* DEBUG */cout << m_CommandsValues[comm] << endl;
