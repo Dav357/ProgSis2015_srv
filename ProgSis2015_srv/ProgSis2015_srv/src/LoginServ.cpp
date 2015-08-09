@@ -1,6 +1,5 @@
 #include "GenIncludes.hpp"
 
-
 using namespace std;
 
 /* Funzioni classe Account */
@@ -64,41 +63,49 @@ Account login(int s_c) {
 	Account ac;
 	char buffer[MAX_BUF_LEN] = "", comm[COMM_LEN + 1] = "";
 
-	len = recv(s_c, comm, COMM_LEN, 0);
-	buffer[len] = '\0';
-
-	try {
-		// Richiesta di login o richiesta di creazione account
-		if (!strcmp(comm, "LOGIN___") || (!strcmp(comm, "CREATEAC"))) {
-			cout << "- [" << pid << "] Autenticazione in corso" << endl;
-			cout << "- [" << pid << "] In attesa dei dati di accesso" << endl;
-			// Ricezione "[username]\r\n[sha-256_password]\r\n"
-			len = read(s_c, buffer, MAX_BUF_LEN);
-			buffer[len] = '\0';
-			// Inserimento in stringhe di username...
-			buf = strtok(buffer, "\r\n");
-			ac.assign_username(buf);
-			// ... e dell'SHA-256 della password
-			buf = strtok(NULL, "\r\n");
-			ac.assign_password(buf);
-			if (!strcmp(comm, "LOGIN___")) {
-				flags = LOGIN;
+	if ((len = recv(s_c, comm, COMM_LEN, 0)) == 8) {
+		try {
+			// Richiesta di login o richiesta di creazione account
+			if (!strcmp(comm, "LOGIN___") || (!strcmp(comm, "CREATEAC"))) {
+				cout << "- [" << pid << "] Autenticazione in corso" << endl;
+				cout << "- [" << pid << "] In attesa dei dati di accesso" << endl;
+				// Ricezione "[username]\r\n[sha-256_password]\r\n"
+				len = recv(s_c, buffer, MAX_BUF_LEN, 0);
+				if (len != 0 && len != -1) {
+					buffer[len] = '\0';
+					// Inserimento in stringhe di username...
+					buf = strtok(buffer, "\r\n");
+					ac.assign_username(buf);
+					// ... e dell'SHA-256 della password
+					buf = strtok(NULL, "\r\n");
+					ac.assign_password(buf);
+					if (!strcmp(comm, "LOGIN___")) {
+						flags = LOGIN;
+					} else {
+						flags = CREATEACC;
+					}
+					if (account_manag(ac, flags)) {
+						send_command(s_c, "LOGGEDOK");
+					} else {
+						send_command(s_c, "LOGINERR");
+					}
+					return ac;
+				} else {
+					send_command(s_c, "LOGINERR");
+					ac.clear();
+					return ac;
+				}
 			} else {
-				flags = CREATEACC;
+				// Comando non riconosciuto
+				send_command(s_c, "UNKNOWN_");
+				return ac;
 			}
-			if (account_manag(ac, flags)) {
-				send_command(s_c, "LOGGEDOK");
-			} else {
-				send_command(s_c, "LOGINERR");
-			}
-			return ac;
-		} else {
-			// Comando non riconosciuto
-			send_command(s_c, "UNKNOWN_");
+		} catch (SQLite::Exception& e) {
+			send_command(s_c, "DB_ERROR");
 			return ac;
 		}
-	} catch (SQLite::Exception& e) {
-		send_command(s_c, "DB_ERROR");
+	} else {
+		///* DEBUG */cerr << "Errore nella ricezione del comando" << endl;
 		return ac;
 	}
 }

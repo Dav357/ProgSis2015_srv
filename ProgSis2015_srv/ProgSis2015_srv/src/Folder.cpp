@@ -36,28 +36,36 @@ Folder select_folder(int s_c, string usr) {
 	string path;
 
 	len = recv(s_c, buffer, MAX_BUF_LEN, 0);
-	buffer[len] = '\0';
-	path.assign(buffer);
+	if (len != 0 && len != -1) {
+		buffer[len] = '\0';
+		path.assign(buffer);
 
-	// Costruzuone nome tabella relativa alla cartella considerata
-	Folder f(path, usr);
+		// Costruzuone nome tabella relativa alla cartella considerata
+		Folder f(path, usr);
 
-	// Apertura DB (sola lettura)
-	Database db("database.db3");
+		// Apertura DB (sola lettura)
+		Database db("database.db3");
 
-	if (db.tableExists(f.getTableName())) {
-		///* DEBUG */cout << "Trovata tabella relativa alla cartella " << path << endl;
+		if (db.tableExists(f.getTableName())) {
+			///* DEBUG */cout << "Trovata tabella relativa alla cartella " << path << endl;
 
+		} else {
+			///* DEBUG */cout << "Tabella relativa alla cartella " << path << " non trovata, creazione tabella" << endl;
+			create_table_folder(f);
+		}
+
+		send_command(s_c, "FOLDEROK");
+		return f;
 	} else {
-		///* DEBUG */cout << "Tabella relativa alla cartella " << path << " non trovata, creazione tabella" << endl;
-		create_table_folder(f);
-	}
+		///* DEBUG */cout<<"Errore nella ricezione del persorso" << endl;
+		Folder f;
+		send_command(s_c, "FOLD_ERR");
+		return f;
 
-	send_command(s_c, "FOLDEROK");
-	return f;
+	}
 }
 
-bool create_table_folder(Folder f) {
+bool create_table_folder(Folder& f) {
 	using namespace SQLite;
 	Database db("database.db3", SQLITE_OPEN_READWRITE);
 	string _query("CREATE TABLE [");
@@ -66,10 +74,10 @@ bool create_table_folder(Folder f) {
 	Statement query(db, _query);
 
 	if (query.exec() == 0) {
-		/* DEBUG */cout << "Tabella " << f.getTableName() << " creata con successo" << endl;
+		///* DEBUG */cout << "Tabella " << f.getTableName() << " creata con successo" << endl;
 		return true;
 	} else {
-		/* DEBUG */cout << "Errore nella creazione della tabella " << f.getTableName() << endl;
+		///* DEBUG */cout << "Errore nella creazione della tabella " << f.getTableName() << endl;
 		return false;
 	}
 

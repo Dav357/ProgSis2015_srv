@@ -24,6 +24,6 @@ public:
 };
 
 Folder select_folder(int, std::string);
-bool create_table_folder(Folder);
+bool create_table_folder(Folder&);
 
 #endif /* FOLDER_H_ */

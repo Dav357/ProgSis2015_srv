@@ -13,7 +13,7 @@
 using namespace std;
 
 /* Metodi della classe file */
-File::File(string fullpath, Folder folder, size_t size, time_t timestamp, char *h) {
+File::File(string fullpath, Folder& folder, size_t size, time_t timestamp, char *h) {
 
 	string name(fullpath, folder.getPath().length() + 1, string::npos);
 
@@ -24,7 +24,7 @@ File::File(string fullpath, Folder folder, size_t size, time_t timestamp, char *
 	hash = h;
 }
 
-File::File(string fullpath, Folder folder, size_t size, time_t timestamp, string h) {
+File::File(string fullpath, Folder& folder, size_t size, time_t timestamp, string h) {
 
 	string name(fullpath, folder.getPath().length() + 1, string::npos);
 
@@ -55,8 +55,15 @@ bool receive_file(int s_c, Folder& folder) {
 	size_t size;
 	time_t timestamp;
 
+	SQLite::Database db("database.db3", SQLITE_OPEN_READWRITE);
+	SQLite::Transaction _transaction(db);
+
 	// Ricezione: Nome completo file\r\n | Dimensione file (8 Byte) | Hash del file (16 Byte) | Timestamp (8 Byte)
 	len = recv(s_c, buffer, MAX_BUF_LEN, 0);
+	if (len == 0 || len == -1) {
+		/* DEBUG */cout << "Errore nella ricezione dei dati del file";
+		return false;
+	}
 	buffer[len] = '\0';
 	/* DEBUG */cout << "Stringa ricevuta: " << buffer << endl << "Lunghezza: " << len << endl;
 	/* Estrazione nome, dimensione, hash, timestamp */
@@ -96,33 +103,33 @@ bool receive_file(int s_c, Folder& folder) {
 	// Ricezione contenuto del file
 	if (receive_file_data(s_c, file)) {
 		/* Inserimento file nel database */;
-		/* DEBUG */cout << "Inserimento informazioni del DB" << endl;
-		using namespace SQLite;
-		Database db("database.db3", SQLITE_OPEN_READWRITE);
-		/*try {*/
-		string _query("INSERT INTO [");
-		_query.append(folder.getTableName());
-		_query.append("] (File_CL, Last_Modif, File_SRV, Hash) VALUES (?, ?, ?, ?)");
-		Statement query(db, _query);
-		query.bind(1, file.getName());
-		query.bind(2, (long long int) file.getTimestamp());
-		query.bind(3, file.save_path);
-		query.bind(4, file.getHash());
-		if (query.exec() == 1) {
-			/* DEBUG */cout << "Entry relativa al file inserita con successo" << endl;
-			return true;
+		///* DEBUG */cout << "Inserimento informazioni del DB" << endl;
+		try {
+			string _query("INSERT INTO [");
+			_query.append(folder.getTableName());
+			_query.append("] (File_CL, Last_Modif, File_SRV, Hash) VALUES (?, ?, ?, ?)");
+			SQLite::Statement query(db, _query);
+			query.bind(1, file.getName());
+			query.bind(2, (long long int) file.getTimestamp());
+			query.bind(3, file.save_path);
+			query.bind(4, file.getHash());
+			if (query.exec() == 1) {
+				/* DEBUG */cout << "Entry relativa al file inserita con successo" << endl;
+				_transaction.commit();
+				return true;
+			}
+		} catch (SQLite::Exception &e) {
+			/* DEBUG */cerr << "Errore nell'accesso al DB: " << e.what() << endl;
+			return false;
 		}
-		/*} catch (SQLite::Exception &e) {
-		  DEBUG /cerr << "Errore nell'accesso al DB" << endl;
-		 return false;
-		 }*/
 	} else {
+		/* DEBUG */cout << "Errore nella ricezione del file" << endl;
 		return false;
 	}
-	return false;
+	return true;
 }
 
-bool receive_file_data(int s, File& file_info) {
+bool receive_file_data(int s_c, File& file_info) {
 
 	int fpoint;
 	time_t t = time(NULL);
@@ -154,17 +161,19 @@ bool receive_file_data(int s, File& file_info) {
 		///* DEBUG */cout << "File " << fullpath << " creato correttamente" << endl;
 		///* DEBUG */ cout << "Ricezione file in corso" << endl;
 		//Loop di lettura bytes inviati dal client
-		for (size_t received = 0, rbyte = 0;;) {
-			rbyte = read(s, buffer, MAX_BUF_LEN);
+		int rbyte = 0;
+		rbyte = recv(s_c, buffer, MAX_BUF_LEN, 0);
+		for (size_t received = 0; ((rbyte != 0) | (rbyte != -1));) {
 			write(fpoint, buffer, rbyte);
 			received += rbyte;
 			if (received == file_info.getSize()) {
-				send_command(s, "DATA_OK_");
+				send_command(s_c, "DATA_OK_");
 				close(fpoint);
-				break;
+				return true;
 			}
+			rbyte = recv(s_c, buffer, MAX_BUF_LEN, 0);
 		}
-		///* DEBUG */cout << "Ricezione file terminata correttamente" << endl;
-		return true;
+		///* DEBUG */cout << "Errore nella ricezione del file" << endl;
+		return false;
 	}
 }

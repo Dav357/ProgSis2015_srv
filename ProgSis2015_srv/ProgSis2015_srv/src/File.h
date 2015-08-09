@@ -25,8 +25,8 @@ private:
 public:
 	// Percorso locale
 	std::string save_path;
-	File(std::string, Folder, size_t, time_t, char*);
-	File(std::string, Folder, size_t, time_t, std::string);
+	File(std::string, Folder&, size_t, time_t, char*);
+	File(std::string, Folder&, size_t, time_t, std::string);
 	std::string getFullPath();
 	std::string getName(){return filename;};
 	Folder& getBasePath(){return base_path;};
