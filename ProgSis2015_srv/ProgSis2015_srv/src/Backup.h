@@ -21,5 +21,4 @@ public:
 	void completed();
 };
 
-
 #endif /* BACKUP_H_ */

@@ -4,8 +4,8 @@
  *  Created on: 03 ago 2015
  *      Author: davide
  */
-#ifndef LOGINSERV_HPP_
-#define LOGINSERV_HPP_
+#ifndef LOGINSERV_H_
+#define LOGINSERV_H_
 
 #include "SQLiteCpp/SQLiteCpp.h"
 
@@ -28,10 +28,9 @@ public:
 	void assign_username(char*);
 	void assign_password(std::string);
 	void assign_password(char*);
-	/* Getter */
 	std::string getUser(){return usr;};
 	bool is_complete(){return complete;};
-	/**/
+
 	bool bind_to_query(SQLite::Statement&);
 	void clear();
 };
@@ -39,4 +38,4 @@ public:
 Account login(int);
 bool account_manag(Account& ac, int flag);
 
-#endif /* LOGINSERV_HPP_ */
+#endif /* LOGINSERV_H_ */

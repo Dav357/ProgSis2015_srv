@@ -1,4 +1,5 @@
 #include "GenIncludes.hpp"
+#include "LoginServ.h"
 
 using namespace std;
 
@@ -40,6 +41,7 @@ void Account::assign_password(char* password) {
 	}
 }
 bool Account::bind_to_query(SQLite::Statement& q) {
+	// La query deve avere PRIMA lo username POI la password
 	if (complete) {
 		q.bind(1, usr);
 		q.bind(2, shapass);

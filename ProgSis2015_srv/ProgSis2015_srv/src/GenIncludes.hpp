@@ -16,13 +16,12 @@
 #include <string.h>
 #include <sys/socket.h>
 
-#include "LoginServ.hpp"
+#include "LoginServ.h"
 #include "File.h"
 #include "Folder.h"
 #include "Backup.h"
 #include "SQLiteCpp/SQLiteCpp.h"
 
 void send_command(int s_c, const char *command);
-
 
 #endif /* GENINCLUDES_HPP_ */
