@@ -58,5 +58,10 @@ void Transaction::commit()
     }
 }
 
+// Status of the transaction
+bool Transaction::isCommited()
+{
+	return mbCommited;
+}
 
 }  // namespace SQLite

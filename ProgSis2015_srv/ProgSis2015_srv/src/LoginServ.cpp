@@ -105,7 +105,7 @@ Account login(int s_c) {
 			return ac;
 		}
 	} else {
-		///* DEBUG */cerr << "Errore nella ricezione del comando" << endl;
+		/* DEBUG */cerr << "Errore nella ricezione del comando" << endl;
 		return ac;
 	}
 }
@@ -117,9 +117,6 @@ bool account_manag(Account& ac, int flags) {
 	string _query;
 	try {
 		Database db("database.db3", flags);
-		///* DEBUG */cout << "SQLite database file '" << db.getFilename() << "' opened successfully with flags: " << flags << endl;
-		///* DEBUG */bool bExists = db.tableExists("users");
-		///* DEBUG */cout << "SQLite table 'test' exists=" << bExists << endl;
 		if (flags == LOGIN) {
 			/* Login */
 			_query.assign("SELECT * FROM users WHERE username = ? AND sha2_pass = ?");
@@ -128,23 +125,22 @@ bool account_manag(Account& ac, int flags) {
 			_query.assign("INSERT INTO users (username, sha2_pass) VALUES (?, ?)");
 		}
 		Statement query(db, _query);
-		///* DEBUG */ cout << "SQLite statement '" << query.getQuery() << "' compiled (" << query.getColumnCount() << " columns in the result)" << endl;
 		ac.bind_to_query(query);
 		if (flags == LOGIN) {
 			if (query.executeStep()) {
-				///* DEBUG */ cout << "Account trovato" << endl;
+				/* DEBUG */cout << "Account trovato" << endl;
 				return true;
 			} else {
-				///* DEBUG */ cerr << "Account non trovato" << endl;
+				/* DEBUG */cerr << "Account non trovato" << endl;
 				ac.clear();
 				return false;
 			}
 		} else {
 			if (query.exec() == 1) {
-				///* DEBUG */ cout << "Account creato con successo" << endl;
+				/* DEBUG */cout << "Account creato con successo" << endl;
 				return true;
 			} else {
-				///* DEBUG */cerr << "Errore nella creazione dell'account" << endl;
+				/* DEBUG */cerr << "Errore nella creazione dell'account" << endl;
 				ac.clear();
 				return false;
 			}

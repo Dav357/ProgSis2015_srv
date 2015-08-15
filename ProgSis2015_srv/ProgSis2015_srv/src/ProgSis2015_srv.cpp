@@ -20,16 +20,25 @@
 using namespace std;
 
 enum StringValue {
-	Undefined, Select_folder, Clear_folder, Receive_file, Logout
+	Undefined, Select_folder, Clear_folder, Receive_file, Receive_full_backup, Send_full_backup, New_file_current_backup, Del_file_current_backup, Alter_file_current_backup, Get_current_files, Logout
 };
 
 static map<string, StringValue> m_CommandsValues;
 
 void server_function(int, int);
+
 static void Initialize() {
 	m_CommandsValues["SET_FOLD"] = Select_folder;
 	m_CommandsValues["CLR_FOLD"] = Clear_folder;
 	m_CommandsValues["REC_FILE"] = Receive_file;
+	m_CommandsValues["SYNC_RCV"] = Receive_full_backup;
+	m_CommandsValues["FLD_STAT"] = Get_current_files;
+
+	m_CommandsValues["NEW_FILE"] = New_file_current_backup;
+	m_CommandsValues["DEL_FILE"] = Del_file_current_backup;
+	m_CommandsValues["UPD_FILE"] = Alter_file_current_backup;
+
+	m_CommandsValues["SYNC_SND"] = Send_full_backup;
 	m_CommandsValues["LOGOUT__"] = Logout;
 	///* DEBUG*/cout << "m_CommandsValues contiene " << m_CommandsValues.size() << " elementi." << endl;
 }
@@ -107,9 +116,11 @@ void server_function(int s_c, int pid) {
 	Account ac;
 	Folder f;
 	int len;
-	char buffer[MAX_BUF_LEN + 1] = "", comm[COMM_LEN + 1] = "";
+	char buffer[MAX_BUF_LEN + 1] = "", comm[2 * COMM_LEN] = "";
+	/*freopen(string("stdout_[" + to_string(pid) + "].log").c_str(), "w", stdout);
+	 freopen(string("stderr_[" + to_string(pid) + "].log").c_str(), "w", stderr);*/
 
-	// Prima oprerazione: login;
+	// Prima operazione: login;
 	/* DEBUG */strcpy(buffer, "Inserire dati utente o richiesta nuovo account");
 	/* DEBUG */send(s_c, buffer, strlen(buffer), 0);
 	if (!((ac = login(s_c)).is_complete())) {
@@ -122,9 +133,9 @@ void server_function(int s_c, int pid) {
 	while (ac.is_complete()) {
 		// Attesa comando dal client
 		cout << "- [" << pid << "] In attesa di comandi dal client" << endl;
-		len = recv(s_c, comm, COMM_LEN, 0);
-		if (len == 8) {
-
+		len = recv(s_c, comm, 2 * COMM_LEN, 0);
+		if (len == COMM_LEN) {
+			comm[len] = '\0';
 			///* DEBUG */cout << comm << endl;
 			///* DEBUG */cout << m_CommandsValues[comm] << endl;
 			switch (m_CommandsValues[comm]) {
@@ -132,7 +143,8 @@ void server_function(int s_c, int pid) {
 				comm[0] = '\0';
 				cout << "- [" << pid << "] Ricevuto comando 'seleziona cartella'" << endl;
 				cout << "- [" << pid << "] In attesa del percorso" << endl;
-				f = select_folder(s_c, ac.getUser());
+				send_command(s_c, "CMND_REC");
+				f = select_folder(s_c, ac);
 				if (!f.getPath().empty()) {
 					cout << "- [" << pid << "] Cartella selezionata: " << f.getPath() << endl;
 				} else {
@@ -142,18 +154,54 @@ void server_function(int s_c, int pid) {
 			case Clear_folder:
 				comm[0] = '\0';
 				cout << "- [" << pid << "] Ricevuto comando 'deseleziona cartella'" << endl;
+				send_command(s_c, "CMND_REC");
 				f.clear_folder();
 				cout << "- [" << pid << "] Cartella deselezionata" << endl;
 				break;
-			case Receive_file:
+
+			case Get_current_files:
 				comm[0] = '\0';
-				cout << "- [" << pid << "] Ricevuto comando 'ricevi file'" << endl;
-				cout << "- [" << pid << "] In attesa del file" << endl;
-				receive_file(s_c, f);
+				cout << "- [" << pid << "] Ricevuto comando 'Stato corrente della cartella'" << endl;
+				send_command(s_c, "CMND_REC");
+				get_folder_stat(s_c, f);
+				break;
+			case New_file_current_backup:
+				comm[0] = '\0';
+				cout << "- [" << pid << "] Ricevuto comando 'Nuovo file nel backup corrente'" << endl;
+				send_command(s_c, "CMND_REC");
+				new_file_backup(s_c, f);
+				break;
+			/* POSSIBILE RIDONDANZA ↓↑*/
+			case Alter_file_current_backup:
+				comm[0] = '\0';
+				cout << "- [" << pid << "] Ricevuto comando 'Modifica file nel bakcup corrente'" << endl;
+				send_command(s_c, "CMND_REC");
+				new_file_backup(s_c, f);
+				break;
+			///////////////////////////////////////////////////////////
+			case Del_file_current_backup:
+				comm[0] = '\0';
+				cout << "- [" << pid << "] Ricevuto comando 'Elimina file da backup corrente'" << endl;
+				send_command(s_c, "CMND_REC");
+
+				break;
+
+			///////////////////////////////////////////////////////////
+			case Receive_full_backup:
+				cout << "- [" << pid << "] Ricevuto comando 'Backup cartella completo'" << endl;
+				send_command(s_c, "CMND_REC");
+				full_backup(s_c, f);
+				break;
+			case Send_full_backup:
+				comm[0] = '\0';
+				cout << "- [" << pid << "] Ricevuto comando 'Invia backup completo'" << endl;
+				send_command(s_c, "CMND_REC");
+
 				break;
 			case Logout:
 				comm[0] = '\0';
 				cout << "- [" << pid << "] Ricevuto comando 'logout'" << endl;
+				send_command(s_c, "CMND_REC");
 				ac.clear();
 				return;
 				break;

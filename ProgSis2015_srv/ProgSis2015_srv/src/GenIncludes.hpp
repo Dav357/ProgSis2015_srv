@@ -10,14 +10,16 @@
 
 #include <iostream>
 #include <cstdlib>
+#include <cstdio>
 #include <unistd.h>
 #include <string>
 #include <string.h>
 #include <sys/socket.h>
 
 #include "LoginServ.hpp"
-#include "Folder.h"
 #include "File.h"
+#include "Folder.h"
+#include "Backup.h"
 #include "SQLiteCpp/SQLiteCpp.h"
 
 void send_command(int s_c, const char *command);
