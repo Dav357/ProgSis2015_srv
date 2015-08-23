@@ -4,16 +4,14 @@
  *  Created on: 03 ago 2015
  *      Author: davide
  */
-#ifndef LOGINSERV_H_
-#define LOGINSERV_H_
+#ifndef ACCOUNT_H_
+#define ACCOUNT_H_
 
 #include "SQLiteCpp/SQLiteCpp.h"
 
-#define LOGIN 0x00000001
-#define CREATEACC 0x00000002
-#define MAX_BUF_LEN 1024
-#define COMM_LEN 8
 
+
+class Folder;
 
 class Account{
 	std::string usr;
@@ -30,12 +28,12 @@ public:
 	void assign_password(char*);
 	std::string getUser(){return usr;};
 	bool is_complete(){return complete;};
-
-	bool bind_to_query(SQLite::Statement&);
+	bool account_manag(int flag);
+	Folder select_folder(int);
 	void clear();
 };
 
-Account login(int);
-bool account_manag(Account& ac, int flag);
+Account login(int, char*);
 
-#endif /* LOGINSERV_H_ */
+
+#endif /* ACCOUNT_H_ */

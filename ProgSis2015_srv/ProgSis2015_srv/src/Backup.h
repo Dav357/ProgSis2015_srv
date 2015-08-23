@@ -19,6 +19,9 @@ public:
 	Backup(int, Folder&);
 	virtual ~Backup();
 	void completed();
+	bool isComplete(){return complete;};
 };
+
+void db_maintenance(std::string);
 
 #endif /* BACKUP_H_ */

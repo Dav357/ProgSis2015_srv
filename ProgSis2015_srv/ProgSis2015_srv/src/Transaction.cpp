@@ -59,7 +59,7 @@ void Transaction::commit()
 }
 
 // Status of the transaction
-bool Transaction::isCommited()
+bool Transaction::isCommitted()
 {
 	return mbCommited;
 }

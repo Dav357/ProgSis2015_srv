@@ -10,6 +10,7 @@
 #include "Folder.h"
 
 class File {
+
 private:
 	// Riferimento all'oggeto che contiene informazioni riguardo alla cartella in cui si trova il file (REMOTO)
 	Folder& base_path;
@@ -38,11 +39,10 @@ public:
 	time_t getTimestamp(){return timestamp;};
 	std::string getHash(){return hash;};
 	void completed(){complete = true;};
+	bool receive_file_data (int socket, std::string);
+	bool hash_check (int fpointer);
 };
 
-bool receive_file(int, Folder&, int, SQLite::Database&);
-bool receive_file_data (int, File&);
-bool new_file_backup(int, Folder&);
-void SQL_copy_rows(SQLite::Database&, Folder&, int);
+
 
 #endif /* FILE_H_ */

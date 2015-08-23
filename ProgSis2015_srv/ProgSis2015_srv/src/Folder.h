@@ -8,8 +8,6 @@
 #ifndef FOLDER_H_
 #define FOLDER_H_
 
-#include <vector>
-
 class File;
 
 class Folder {
@@ -20,18 +18,25 @@ private:
 	std::vector<File> files;
 
 public:
-	Folder(){};
-	Folder(std::string, Account);
+	Folder() {};
+	Folder(std::string, Account&);
+	bool isSelected(){return (!path.empty());};
 	std::string getPath(){return path;}
 	std::string getTableName(){return table_name;}
 	std::string getUser(){return user.getUser();}
 	void insert_file(File);
 	void clear_folder();
 	std::vector<File> get_files(){return files;};
+	bool create_table_folder();
+	void get_folder_stat(int);
+	void remove_files();
+	bool full_backup(int);
+	void send_backup(int);
+	void send_single_file(int);
+	bool new_file_backup(int);
+	bool delete_file_backup(int);
+	bool receive_file(int socket, int versione, SQLite::Database&, std::string);
+	void SQL_copy_rows(SQLite::Database&, int);
 };
-
-Folder select_folder(int, Account& ac);
-bool create_table_folder(Folder&);
-void get_folder_stat(int, Folder&);
 
 #endif /* FOLDER_H_ */
