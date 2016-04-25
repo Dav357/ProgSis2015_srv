@@ -14,7 +14,6 @@
 
 #define DEBUG 0x0001
 #define ERROR 0x0002
-#define INFO 0x0003
 #define LOG_ONLY 0x1000
 #define CONSOLE_ONLY 0x2000
 #define LOG_AND_CONSOLE 0x3000

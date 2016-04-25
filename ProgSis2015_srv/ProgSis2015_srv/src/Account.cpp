@@ -46,7 +46,8 @@ void Account::assign_password(char* password) {
 }
 
 void Account::clear() {
-	remove_from_usertable(usr);
+	if (!usr.empty())
+		remove_from_usertable(usr);
 	usr.clear();
 	shapass.clear();
 	complete = false;
@@ -55,8 +56,8 @@ void Account::clear() {
 
 bool Account::account_manag(int flags) {
 	// flags vale:
-	// - 0x00000001 per login (equivale a DB in sola lettura)
-	// - 0x00000002 per creazione account (DB in lettura/scrittura)
+	// - 0x01 per login (equivale a DB in sola lettura)
+	// - 0x02 per creazione account (DB in lettura/scrittura)
 	string _query;
 	SQLite::Database db("database.db3", flags);
 	if (flags == LOGIN) {
@@ -72,22 +73,18 @@ bool Account::account_manag(int flags) {
 	if (flags == LOGIN) {
 		if (query.executeStep()) {
 			Logger::write_to_log("Account " + usr + " trovato");
-			///* DEBUG */cout << "- Account trovato" << endl;
 			return (add_to_usertable(usr));;
 		} else {
 			Logger::write_to_log("Account " +usr+" non trovato");
-			///* DEBUG */cerr << "- Account non trovato" << endl;
 			clear();
 			return false;
 		}
 	} else {
 		if (query.exec() == 1) {
 			Logger::write_to_log("Account " + usr + " creato con successo, utente connesso");
-			///* DEBUG */cout << "- Account creato con successo" << endl;
 			return (add_to_usertable(usr));
 		} else {
 			Logger::write_to_log("Errore nella creazione dell'account", ERROR);
-			///* DEBUG */cerr << "- Errore nella creazione dell'account" << endl;
 			clear();
 			return false;
 		}
@@ -116,12 +113,10 @@ Folder Account::select_folder(int s_c) {
 
 		if (db.tableExists(f.getTableName())) {
 			Logger::write_to_log("Trovata tabella relativa alla cartella");
-			///* DEBUG */cout << "- Trovata tabella relativa alla cartella " << path << endl;
 			send_command(s_c, "FOLDEROK");
 			return f;
 		} else {
 			Logger::write_to_log("Tabella relativa alla cartella " + path + " non trovata, creazione tabella");
-			///* DEBUG */cout << "- Tabella relativa alla cartella " << path << " non trovata, creazione tabella" << endl;
 			if (f.create_table_folder()) {
 				send_command(s_c, "FOLDEROK");
 				return f;
@@ -132,7 +127,6 @@ Folder Account::select_folder(int s_c) {
 		}
 	} catch (SQLite::Exception& e) {
 		Logger::write_to_log("Errore DB: " + string(e.what()), ERROR);
-		///* DEBUG */cerr << "- Errore DB: " << e.what() << endl;
 		send_command(s_c, "DB_ERROR");
 		return (Folder());
 	}
@@ -158,8 +152,6 @@ Account login(int s_c, char *usertable) {
 		// Richiesta di login o richiesta di creazione account
 		if (!strcmp(comm, "LOGIN___") || (!strcmp(comm, "CREATEAC"))) {
 			Logger::write_to_log("Autenticazione in corso, in attesa dei dati di accesso");
-			//cout << "- Autenticazione in corso" << endl;
-			//cout << "- In attesa dei dati di accesso" << endl;
 			// Ricezione "[username]\r\n[sha-256_password]\r\n"
 			len = recv(s_c, buffer, MAX_BUF_LEN, 0);
 			if ((len == 0) || (len == -1)) {
@@ -193,11 +185,9 @@ Account login(int s_c, char *usertable) {
 		}
 	} catch (SQLite::Exception& e) {
 		Logger::write_to_log("Errore DB: " + string(e.what()), ERROR);
-		///* DEBUG */cerr << "- Errore DB: " << e.what() << endl;
 		send_command(s_c, "DB_ERROR");
 		ac.clear();
 		return ac;
 	}
 	return (Account());
 }
-

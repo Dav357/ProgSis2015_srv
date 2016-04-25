@@ -16,6 +16,7 @@
 #include <string>
 #include <string.h>
 #include <chrono>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/mman.h>
 
@@ -26,8 +27,8 @@
 #include "Backup.h"
 #include "SQLiteCpp/SQLiteCpp.h"
 
-#define LOGIN 0x00000001
-#define CREATEACC 0x00000002
+#define LOGIN 0x01
+#define CREATEACC 0x02
 #define MAX_BUF_LEN 1024
 #define SHORT_BUF_LEN 128
 #define COMM_LEN 8

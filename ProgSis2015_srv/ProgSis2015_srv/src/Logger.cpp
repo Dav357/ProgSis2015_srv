@@ -42,10 +42,6 @@ void Logger::write_to_log(std::string msg, int type, int scope) {
 		pref.assign("DEBUG");
 		target = &cout;
 		break;
-	case INFO:
-		pref.assign("INFO ");
-		target = &cout;
-		break;
 	case ERROR:
 		pref.assign("ERROR");
 		target = &cerr;

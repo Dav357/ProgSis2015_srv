@@ -9,8 +9,6 @@
 
 #include "SQLiteCpp/SQLiteCpp.h"
 
-
-
 class Folder;
 
 class Account{

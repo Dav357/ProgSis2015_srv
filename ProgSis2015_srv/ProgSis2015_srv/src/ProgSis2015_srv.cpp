@@ -10,7 +10,6 @@
 #include <map>
 #include <semaphore.h>
 #include <csignal>
-#include <sys/stat.h>
 #include <sys/wait.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -39,18 +38,23 @@ enum StringValue {
 };
 
 static map<string, StringValue> m_CommandsValues;
+// Puntatore per mmap
+char *usertable = NULL;
+sem_t *sem_usertable = NULL;
 
 void child_handler(int param) {
-	signal(SIGCHLD, child_handler);
-	while (waitpid((pid_t) (-1), 0, WNOHANG) > 0) {
-		;
-	}
 
+	pid_t pid;
+	while ((pid = waitpid((pid_t) (-1), NULL, WNOHANG)) > 0) {
+		Logger::write_to_log("Il processo figlio [" + to_string(pid) + "] è terminato", DEBUG, LOG_ONLY);
+	}
+	signal(SIGCHLD, child_handler);
 }
 
 void server_function(int, int);
 
 static void Initialize() {
+
 	m_CommandsValues["SET_FOLD"] = Select_folder;
 	m_CommandsValues["CLR_FOLD"] = Clear_folder;
 	m_CommandsValues["REC_FILE"] = Receive_file;
@@ -58,80 +62,83 @@ static void Initialize() {
 	m_CommandsValues["FLD_STAT"] = Get_current_folder_status;
 	m_CommandsValues["NEW_FILE"] = New_file_current_backup;
 	m_CommandsValues["UPD_FILE"] = Alter_file_current_backup;
-
 	m_CommandsValues["DEL_FILE"] = Del_file_current_backup;
+
 	m_CommandsValues["SYNC_SND"] = Send_full_backup;
 	m_CommandsValues["FILE_SND"] = Send_single_file;
-
 	m_CommandsValues["LOGOUT__"] = Logout;
-	///* DEBUG*/cout << "m_CommandsValues contiene " << m_CommandsValues.size() << " elementi." << endl;
+	Logger::write_to_log("Mappa dei comandi inizializzata correttamente, numero di elementi presenti: " + to_string(m_CommandsValues.size()), DEBUG, LOG_ONLY);
 }
-
-// Puntatore per mmap
-char *usertable = NULL;
-sem_t *sem_usertable = NULL;
 
 int main(int argc, char** argv) {
 
 	int port, pid;
 	int optval = 1;
 	socklen_t optlen = sizeof(optval);
-
 	struct sockaddr_in saddr, claddr;
 	socklen_t claddr_len = sizeof(struct sockaddr_in);
 	int s, s_c; //Socket
 
+	Logger log("[" + to_string(getpid()) + "] debug.log");
 	// Inizializzazione tabella comandi
 	Initialize();
 
 	if (argc != 2) {
-		cerr << "- Errore nei parametri\n- Formato corretto: <porta>\n" << endl;
+		Logger::write_to_log("Errore nei parametri, formato corretto: <nome eseguibile> <porta>", ERROR);
 		return (-1);
 	}
 
 	port = atoi(argv[1]);
-
 	// Creazione socket
 	if ((s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
-		cerr << "- Errore nella crezione del socket, chiusura programma" << endl;
+		Logger::write_to_log("Errore nella creazione del socket, chiusura programma", ERROR);
 		return -1;
 	}
+	Logger::write_to_log("Socket creato correttamente", DEBUG, LOG_ONLY);
 
 	saddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	saddr.sin_family = AF_INET;
 	saddr.sin_port = htons(port);
-
 	// Impostazione di SO_KEEPALIVE
 	if (setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen) < 0) {
-		cerr << "- Errore nell'impostazione delle opzioni del socket, chiusura programma" << endl;
+		Logger::write_to_log("Errore nell'impostazione delle opzioni del socket, chiusura programma", ERROR);
 		close(s);
 		return (-1);
 	}
-	///* DEBUG */cout << "SO_KEEPALIVE: " << (optval ? "ON" : "OFF") << endl;
-
+	Logger::write_to_log("Impostazione SO_KEEPALIVE del socket applicata correttamente", DEBUG, LOG_ONLY);
 	// Bind del socket e listen
 	if (bind(s, (struct sockaddr*) &saddr, sizeof(saddr)) == -1) {
-		cerr << "- Errore nel binding del socket, chiusura programma" << endl;
+		Logger::write_to_log("Errore nel binding del socket, chiusura programma", ERROR);
 		close(s);
 		return (-1);
 	}
+	Logger::write_to_log("Bind del socket effettuato correttamente", DEBUG, LOG_ONLY);
 	if (listen(s, BKLOG) == -1) {
-		cerr << "- Errore nell'operazione di ascolto sul socket, chiusura programma" << endl;
+		Logger::write_to_log("Errore nell'operazione di ascolto sul socket, chiusura programma", ERROR);
 		close(s);
 		return (-1);
 	}
-
+	Logger::write_to_log("Socket posto correttamente in ascolto", DEBUG, LOG_ONLY);
 	// Area mappata:
 	//   4096 Byte -> 32 (Lunghezza massima nome utente) x 128 (Possibili utenti connessi contemporaneamente OvK)
 	// + byte necessari per allocare il semaforo (sizeof(sem_t))
-	sem_usertable = (sem_t*) mmap(NULL, sizeof(sem_t) + MMAP_SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
-	usertable = (char*)sem_usertable + sizeof(sem_t);
+	if ((sem_usertable = (sem_t*) mmap(NULL, sizeof(sem_t) + MMAP_SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0)) == MAP_FAILED) {
+		Logger::write_to_log("Errore nella creazione dell'area di memoria condivisa, chiusura programma", ERROR);
+		return (-1);
+	}
+	usertable = (char*) sem_usertable + sizeof(sem_t);
+	Logger::write_to_log("Area di memoria condivisa (tabella utenti e semaforo) creata correttamente", DEBUG, LOG_ONLY);
 	// Inizializzazione semaforo, non locale al processo, 1 accesso per volta
-	sem_init(sem_usertable, 1, 1);
+	if ((sem_init(sem_usertable, 1, 1)) == -1) {
+		Logger::write_to_log("Errore nell'inizializzazione del semaforo", ERROR);
+	}
+	Logger::write_to_log("Semaforo inizializzato correttamente", DEBUG, LOG_ONLY);
 
-	Logger log("[" + to_string(getpid()) + "] debug.log");
-	signal(SIGCHLD, child_handler);
-	while (1) {
+	if ((signal(SIGCHLD, child_handler)) == SIG_ERR) {
+		Logger::write_to_log("Errore nell'istanziamento del gestore del segnale di terminazione dei processi figli", ERROR);
+	}
+	Logger::write_to_log("Gestore del segnale di terminazione dei processi figli istanziato correttamente", DEBUG, LOG_ONLY);
+	for (;;) {
 		/* Padre: in attesa di connessioni */
 		Logger::write_to_log("In attesa di connessioni");
 		s_c = accept(s, (struct sockaddr *) &claddr, &claddr_len);
@@ -142,14 +149,14 @@ int main(int argc, char** argv) {
 		} else if (pid == 0) {
 			// Processo figlio
 			Logger::reopen_log("[" + to_string(getpid()) + "] debug.log");
-			Logger::write_to_log("Connesso all'host: " + string(inet_ntoa(claddr.sin_addr)));
+			Logger::write_to_log("Connesso all'host: " + string(inet_ntoa(claddr.sin_addr)), DEBUG, LOG_ONLY);
 			close(s);
 			server_function(s_c, getpid());
 			close(s_c);
 			return (0);
 		} else {
 			// Processo padre
-			Logger::write_to_log("Connesso all'host: " + string(inet_ntoa(claddr.sin_addr)) + ", il processo [" + to_string(pid) + "] sta comunicando con il client");
+			Logger::write_to_log("Il processo [" + to_string(pid) + "] è connesso all'host: " + string(inet_ntoa(claddr.sin_addr)));
 			close(s_c);
 		}
 	}
@@ -160,108 +167,91 @@ int main(int argc, char** argv) {
 // Funzione di gestione operazioni del server
 void server_function(int s_c, int pid) {
 
+	vector<string> used_tables;
 //Logger log("[" + to_string(pid) + "] debug.log");
 	Account ac;
 	Folder f;
 	int len;
-	char buffer[MAX_BUF_LEN + 1] = "", comm[COMM_LEN + 1] = "";
+	char comm[COMM_LEN + 1] = "";
 
 	try {
 		// Try/catch per perdita connessione
 		// Prima operazione: login;
-		/* DEBUG */strcpy(buffer, "Inserire dati utente o richiesta nuovo account");
-		/* DEBUG */send(s_c, buffer, strlen(buffer), 0);
 		if (!((ac = login(s_c, usertable)).is_complete())) {
 			Logger::write_to_log("Errore nella procedura di autenticazione, chiusura connessione", ERROR);
-			//cerr << "- Errore nella procedura di autenticazione" << endl;
-			//cerr << "- Chiusura connessione" << endl;
 			close(s_c);
 			return;
 		}
 		while (ac.is_complete()) {
 			// Attesa comando dal client
 			Logger::write_to_log("In attesa di comandi dall'utente");
-			//cout << "- In attesa di comandi dal client" << endl;
 			len = recv(s_c, comm, COMM_LEN, 0);
 			if ((len == 0) || (len == -1)) {
 				// Ricevuta stringa vuota: connessione persa
 				throw runtime_error("connessione persa");
 			}
 			comm[len] = '\0';
-			///* DEBUG */cout << comm << endl;
-			///* DEBUG */cout << m_CommandsValues[comm] << endl;
 			switch (m_CommandsValues[comm]) {
 			case Select_folder:
 				comm[0] = '\0';
 				Logger::write_to_log("Ricevuto comando 'seleziona cartella', in attesa del percorso");
-				//cout << "- Ricevuto comando 'seleziona cartella'" << endl;
-				//cout << "- In attesa del percorso" << endl;
 				send_command(s_c, "CMND_REC");
 				f = ac.select_folder(s_c);
 				if (!f.getPath().empty()) {
+					used_tables.push_back(f.getTableName());
 					Logger::write_to_log("Cartella selezionata: " + f.getPath());
-					//cout << "- Cartella selezionata: " << f.getPath() << endl;
 				} else {
 					Logger::write_to_log("Errore nella selezione della cartella", ERROR);
-					//cerr << "- Errore nella selezione della cartella" << endl;
 				}
 				break;
 			case Clear_folder:
 				comm[0] = '\0';
 				Logger::write_to_log("Ricevuto comando 'deseleziona cartella'");
-				//cout << "- Ricevuto comando 'deseleziona cartella'" << endl;
 				send_command(s_c, "CMND_REC");
 				f.clear_folder();
 				Logger::write_to_log("Cartella deselezionata");
-				//cout << "- Cartella deselezionata" << endl;
 				break;
 			case Get_current_folder_status:
 				comm[0] = '\0';
-				Logger::write_to_log("Ricevuto comando 'Stato corrente della cartella'");
-				//cout << "- Ricevuto comando 'stato corrente della cartella'" << endl;
+				Logger::write_to_log("Ricevuto comando 'stato corrente della cartella'");
 				send_command(s_c, "CMND_REC");
 				f.get_folder_stat(s_c);
 				break;
 			case Receive_full_backup:
 				Logger::write_to_log("Ricevuto comando 'backup cartella completo'");
-				//cout << "- Ricevuto comando 'backup cartella completo'" << endl;
 				send_command(s_c, "CMND_REC");
 				f.full_backup(s_c);
 				break;
 			case New_file_current_backup:
 				comm[0] = '\0';
 				Logger::write_to_log("Ricevuto comando 'nuovo file nel backup corrente'");
-				//cout << "- Ricevuto comando 'nuovo file nel backup corrente'" << endl;
 				send_command(s_c, "CMND_REC");
 				f.new_file_backup(s_c);
 				break;
 			case Alter_file_current_backup:
 				comm[0] = '\0';
 				Logger::write_to_log("Ricevuto comando 'modifica file nel backup corrente'");
-				//cout << "- Ricevuto comando 'modifica file nel backup corrente'" << endl;
 				send_command(s_c, "CMND_REC");
 				f.new_file_backup(s_c);
 				break;
 			case Del_file_current_backup:
 				comm[0] = '\0';
-				cout << "- Ricevuto comando 'Elimina file da backup corrente'" << endl;
+				Logger::write_to_log("Ricevuto comando 'elimina file da backup corrente'");
 				send_command(s_c, "CMND_REC");
 				f.delete_file_backup(s_c);
 				break;
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 			case Send_full_backup:
 				comm[0] = '\0';
-				cout << "- Ricevuto comando 'Invia backup completo'" << endl;
+				Logger::write_to_log("Ricevuto comando 'invia backup completo'");
 				send_command(s_c, "CMND_REC");
 				f.send_backup(s_c);
 				break;
 			case Send_single_file:
 				comm[0] = '\0';
-				cout << "- Ricevuto comando 'Invia singolo file dal backup'" << endl;
+				Logger::write_to_log("Ricevuto comando 'invia singolo file dal backup'");
 				send_command(s_c, "CMND_REC");
 				f.send_single_file(s_c);
 				break;
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 			case Logout:
 				comm[0] = '\0';
 				Logger::write_to_log("Ricevuto comando 'logout'");
@@ -269,30 +259,23 @@ void server_function(int s_c, int pid) {
 				send_command(s_c, "CMND_REC");
 				ac.clear();
 				Logger::write_to_log("Disconnessione effettuata");
-				return;
+				break;
 			default:
-				if (ac.is_complete()) {
-					Logger::write_to_log("Ricevuto comando sconosciuto, chiusura connessione con utente " + ac.getUser(), ERROR);
-					//cerr << "- Ricevuto comando sconosciuto" << endl;
-					//cerr << "- Chiusura connessione con utente " << ac.getUser() << endl;
-					ac.clear();
-				}
-				close(s_c);
-				return;
+				throw runtime_error("ricevuto comando sconosciuto");
 			}
 		}
 	} catch (runtime_error& e) {
 		Logger::write_to_log("Disconnessione: " + string(e.what()), ERROR);
-		//cerr << "- Disconnessione: " << e.what() << endl;
-		ac.clear();
-		close(s_c);
-		return;
 	}
+	ac.clear();
+	close(s_c);
+	for (string table : used_tables) {
+		db_maintenance(table);
+	}
+	return;
 }
 
 void send_command(int s_c, const char *command) {
-//char buffer[COMM_LEN + 1];
-//strcpy(buffer, command);
 	send(s_c, command, COMM_LEN, 0);
 }
 
