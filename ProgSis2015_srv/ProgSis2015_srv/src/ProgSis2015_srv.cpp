@@ -22,6 +22,7 @@
 
 using namespace std;
 
+// Enum contente i possibili comandi al server, per uno switch più leggibile
 enum StringValue {
 	Undefined,
 	Select_folder,
@@ -42,6 +43,7 @@ static map<string, StringValue> m_CommandsValues;
 char *usertable = NULL;
 sem_t *sem_usertable = NULL;
 
+// Gestore segnale di terminazione figlio
 void child_handler(int param) {
 
 	pid_t pid;
@@ -53,6 +55,7 @@ void child_handler(int param) {
 
 void server_function(int, int);
 
+// Inizializzazione della mappa dei comandi
 static void Initialize() {
 
 	m_CommandsValues["SET_FOLD"] = Select_folder;
@@ -168,7 +171,7 @@ int main(int argc, char** argv) {
 void server_function(int s_c, int pid) {
 
 	vector<string> used_tables;
-//Logger log("[" + to_string(pid) + "] debug.log");
+	//Logger log("[" + to_string(pid) + "] debug.log");
 	Account ac;
 	Folder f;
 	int len;
@@ -275,15 +278,17 @@ void server_function(int s_c, int pid) {
 	return;
 }
 
+// Invio di un comando all'host
 void send_command(int s_c, const char *command) {
 	send(s_c, command, COMM_LEN, 0);
 }
 
+// Aggiunta di un utente alla lista degli utenti attualmente connessi
 bool add_to_usertable(string user) {
 
-// Aggiungere un utente connesso all'lenco degli utenti:
+	// Aggiungere un utente connesso all'elenco degli utenti:
 	string line;
-// Si scorre l'area di memoria a 32 caratteri per volta
+	// Si scorre l'area di memoria a 32 caratteri per volta
 	sem_wait(sem_usertable);
 	for (int i = 0; i < MMAP_SIZE; i += MMAP_LINE_SIZE) {
 		// Lettura fino al '\0', al massimo 31 caratteri (lunghezza username limitata a 31 caratteri)
@@ -302,19 +307,20 @@ bool add_to_usertable(string user) {
 		}
 		// La riga non è vuota e l'utente nella riga corrente NON corrisponde a quello che sta tentando di fare login
 	}
-// Se si è raggiunta la fine (spazio esaurito per nuovi utenti), si ritorna false
+	// Se si è raggiunta la fine (spazio esaurito per nuovi utenti), si ritorna false
 	Logger::write_to_log("È stato raggiunto il numero massimo di utenti connessi", ERROR);
 	sem_post(sem_usertable);
 	return false;
 
 }
 
+// Rimozione di un utente dalla lista degli utenti attualmente connessi
 void remove_from_usertable(string user) {
 
-// Eliminare un utente dall'elenco utenti:
+	// Eliminare un utente dall'elenco utenti:
 	vector<string> users;
 	string line;
-// Si scorre l'elenco degli utenti
+	// Si scorre l'elenco degli utenti
 	sem_wait(sem_usertable);
 	for (int i = 0; i < MMAP_SIZE; i += MMAP_LINE_SIZE) {
 		// Si legge la riga corrente...
@@ -331,7 +337,7 @@ void remove_from_usertable(string user) {
 		// Altrimenti si salva l'utente corrente nel vettore di stringhe
 		users.push_back(line);
 	}
-// - Si ripopola l'area mappata con il nuovo elenco di nomi utente
+	// - Si ripopola l'area mappata con il nuovo elenco di nomi utente
 	int i = 0;
 	for (string s : users) {
 		sprintf(usertable + i, "%s", user.c_str());

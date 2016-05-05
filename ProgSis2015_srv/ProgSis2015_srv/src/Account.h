@@ -11,6 +11,7 @@
 
 class Folder;
 
+// Classe per la gestione dell'account
 class Account{
 	std::string usr;
 	std::string shapass;

@@ -12,7 +12,7 @@
 #include <openssl/md5.h>
 using namespace std;
 
-/* Metodi della classe file */
+// Costruttore
 File::File(string fullpath, Folder& folder, size_t size, time_t timestamp, string h) :
 		base_path(folder) {
 
@@ -25,7 +25,7 @@ File::File(string fullpath, Folder& folder, size_t size, time_t timestamp, strin
 	complete = false;
 }
 
-/* Costruttore per invio file */
+// Costruttore per invio file
 File::File(string filename, Folder& folder, string h, string savepath) :
 		base_path(folder) {
 
@@ -36,17 +36,19 @@ File::File(string filename, Folder& folder, string h, string savepath) :
 	save_path = savepath;
 	complete = true;
 }
-/* -------------------------- */
 
+// Costruzione percorso completo del file
 string File::getFullPath() {
 	string temp(base_path.getPath() + "\\" + filename);
 	return temp;
 }
 
+// Conferma che il file è completo
 void File::completed() {
 	complete = true;
 }
 
+// Distruttore
 File::~File() {
 	// Se la ricezione non è completa -> CANCELLAZIONE file.
 	if (!complete) {
@@ -58,11 +60,12 @@ File::~File() {
 	}
 }
 
+// Ricezione dei byte che compongono il file
 bool File::receive_file_data(int s_c, string folder_name) {
 
 	int fpoint;
 	time_t t = time(NULL);
-	char buffer[MAX_BUF_LEN];
+	char buffer[MAX_BUF_LEN+1];
 
 	// Costruzione nome nuovo file
 	string path_to_file;
@@ -110,6 +113,7 @@ bool File::receive_file_data(int s_c, string folder_name) {
 	}
 }
 
+// Controllo integrità del file (MD5)
 bool File::hash_check(int fpoint) {
 	// Calcolo MD5 file
 	// Lettura MD5 dalle informazioni ricevute relative al file
@@ -117,7 +121,7 @@ bool File::hash_check(int fpoint) {
 	string remote_md5 = hash;
 
 	lseek(fpoint, 0, SEEK_SET);
-	char buffer[MAX_BUF_LEN];
+	char buffer[MAX_BUF_LEN+1];
 	unsigned char hash[MD5_DIGEST_LENGTH];
 	char hash_str[2 * MD5_DIGEST_LENGTH + 1];
 	MD5_CTX c;
@@ -136,9 +140,10 @@ bool File::hash_check(int fpoint) {
 	return ((local_md5.compare(remote_md5) == 0) ? true : false);
 }
 
+// Invio dei byte che compongono il file
 void File::send_file_data(int s_c) {
 
-	char comm[COMM_LEN], buffer[MAX_BUF_LEN];
+	char comm[COMM_LEN], buffer[MAX_BUF_LEN+1];
 	int fpoint = open(save_path.c_str(), O_RDONLY);
 	send(s_c, hash.c_str(), hash.length(), 0);
 	int len = recv(s_c, comm, COMM_LEN, 0);
@@ -157,4 +162,3 @@ void File::send_file_data(int s_c) {
 	}
 	close(fpoint);
 }
-/* Fine metodi della classe file */

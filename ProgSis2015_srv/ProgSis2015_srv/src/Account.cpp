@@ -4,19 +4,24 @@
 
 using namespace std;
 
-/* Funzioni classe Account */
+/* Costruttori */
+
+// Costruttore parziale, per inizializzazione
 Account::Account() {
 	usr = "";
 	shapass = "";
 	complete = false;
 }
 
+// Costruttore completo
 Account::Account(string username, string password) {
 	usr = username;
 	shapass = password;
 	complete = true;
 }
+/* Fine costruttori */
 
+// Assegnazione nome utente all'account corrente (da stringa)
 void Account::assign_username(std::string username) {
 	usr = username;
 	if (!shapass.empty()) {
@@ -24,6 +29,7 @@ void Account::assign_username(std::string username) {
 	}
 }
 
+// Assegnazione nome utente all'account corrente (da puntatore a char)
 void Account::assign_username(char* username) {
 	usr.assign(username);
 	if (!shapass.empty()) {
@@ -31,6 +37,7 @@ void Account::assign_username(char* username) {
 	}
 }
 
+// Assegnazione password all'account corrente (da stringa)
 void Account::assign_password(std::string password) {
 	shapass = password;
 	if (!usr.empty()) {
@@ -38,6 +45,7 @@ void Account::assign_password(std::string password) {
 	}
 }
 
+// Assegnazione password all'account corrente (da puntatore a char)
 void Account::assign_password(char* password) {
 	shapass.assign(password);
 	if (!usr.empty()) {
@@ -45,6 +53,7 @@ void Account::assign_password(char* password) {
 	}
 }
 
+// Rimozione dei dati relativi all'account
 void Account::clear() {
 	if (!usr.empty())
 		remove_from_usertable(usr);
@@ -54,6 +63,7 @@ void Account::clear() {
 
 }
 
+// Gestione account: login/creazione
 bool Account::account_manag(int flags) {
 	// flags vale:
 	// - 0x01 per login (equivale a DB in sola lettura)
@@ -73,9 +83,9 @@ bool Account::account_manag(int flags) {
 	if (flags == LOGIN) {
 		if (query.executeStep()) {
 			Logger::write_to_log("Account " + usr + " trovato");
-			return (add_to_usertable(usr));;
+			return (add_to_usertable(usr));
 		} else {
-			Logger::write_to_log("Account " +usr+" non trovato");
+			Logger::write_to_log("Account " + usr + " non trovato");
 			clear();
 			return false;
 		}
@@ -89,13 +99,13 @@ bool Account::account_manag(int flags) {
 			return false;
 		}
 	}
-
 }
 
+// Selezione di una cartella relativa all'account
 Folder Account::select_folder(int s_c) {
 
 	int len;
-	char buffer[MAX_BUF_LEN] = "";
+	char buffer[MAX_BUF_LEN+1] = "";
 	string path;
 
 	len = recv(s_c, buffer, MAX_BUF_LEN, 0);
@@ -133,15 +143,14 @@ Folder Account::select_folder(int s_c) {
 	return (Folder());
 }
 
-/* Fine funzioni classe Account*/
-
+// Funzione di login
 Account login(int s_c, char *usertable) {
 
 	int len, flags;
 	char *buf;
 	string usr, shapass;
 	Account ac;
-	char buffer[MAX_BUF_LEN] = "", comm[COMM_LEN + 1] = "";
+	char buffer[MAX_BUF_LEN+1] = "", comm[COMM_LEN + 1] = "";
 	len = recv(s_c, comm, COMM_LEN, 0);
 	if ((len == 0) || (len == -1)) {
 		// Ricevuta stringa vuota: connessione persa

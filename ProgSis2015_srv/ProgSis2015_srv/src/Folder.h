@@ -10,6 +10,7 @@
 
 class File;
 
+// Classe per la gestione delle cartelle
 class Folder {
 private:
 	std::string path;

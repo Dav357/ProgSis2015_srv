@@ -13,6 +13,7 @@ using namespace std;
 ofstream Logger::general_log;
 struct timeval Logger::start_program_time;
 
+// Costruttore: inizia il log all'apertura di un processo
 Logger::Logger(string gen_log) {
 
 	char buffer[BUF_LEN];
@@ -29,6 +30,7 @@ Logger::Logger(string gen_log) {
 
 }
 
+// Scrive il messaggio ricevuto nei modi specificati, default: messaggio di debug da emettere sia in console che nel log degli eventi
 void Logger::write_to_log(std::string msg, int type, int scope) {
 
 	string pref;
@@ -66,6 +68,7 @@ void Logger::write_to_log(std::string msg, int type, int scope) {
 	}
 }
 
+// Distruttore: chiude il log con data e ora di terminazione del processo
 Logger::~Logger() {
 
 	char buffer[BUF_LEN];
@@ -77,6 +80,8 @@ Logger::~Logger() {
 
 }
 
+
+// Funzione di riapertura del log, per i processi figli (altrimenti continuerebbero a scrivere sul file aperto dal padre
 void Logger::reopen_log(string chl_log) {
 
 	char buffer[BUF_LEN];

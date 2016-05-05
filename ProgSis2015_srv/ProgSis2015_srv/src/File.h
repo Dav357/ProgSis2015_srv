@@ -9,10 +9,11 @@
 
 #include "Folder.h"
 
+// Classe relativa ad un file
 class File {
 
 private:
-	// Riferimento all'oggeto che contiene informazioni riguardo alla cartella in cui si trova il file (REMOTO)
+	// Riferimento all'oggetto che contiene informazioni riguardo alla cartella in cui si trova il file (REMOTO)
 	Folder& base_path;
 	// Nome del file
 	std::string filename;
@@ -22,12 +23,11 @@ private:
 	time_t timestamp;
 	// Hash del file
 	std::string hash;
-	// FIle completo
+	// File completo?
 	bool complete;
 	// Percorso locale
 	std::string save_path;
 public:
-	// Metodi
 	File(std::string, Folder&, size_t, time_t, std::string);
 	/* Costruttore per invio file */
 	File(std::string, Folder&, std::string, std::string);

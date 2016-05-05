@@ -10,11 +10,12 @@
 #include "Backup.h"
 using namespace std;
 
-/* Metodi classe backup */
+// Contruttore
 Backup::Backup(int v, Folder& f) :
 		vers(v), complete(false), folder(f) {
 }
 
+// Distruttore
 Backup::~Backup() {
 	if (!complete) {
 		// Se il backup non è completo:
@@ -29,12 +30,12 @@ Backup::~Backup() {
 	}
 }
 
+// Conferma del completamento del backup
 void Backup::completed() {
 	complete = true;
 }
 
-/* Fine metodi classe backup */
-
+// Funzione di pulizia del database alla disconnessione di un utente
 void db_maintenance(string table_name) {
 
 	try {

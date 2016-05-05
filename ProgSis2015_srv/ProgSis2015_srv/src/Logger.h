@@ -18,6 +18,7 @@
 #define CONSOLE_ONLY 0x2000
 #define LOG_AND_CONSOLE 0x3000
 
+// Classe logger, per una gestione più semplice delle comunicazioni dal processo
 class Logger {
 public:
 	Logger(std::string);

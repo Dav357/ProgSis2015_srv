@@ -9,6 +9,7 @@
 #include "Folder.h"
 using namespace std;
 
+// Costruttore
 Folder::Folder(string p, Account& user) :
 		user(user) {
 
@@ -17,16 +18,19 @@ Folder::Folder(string p, Account& user) :
 	table_name = tmp;
 }
 
+// Azzera le informazioni relative alla cartella
 void Folder::clear_folder() {
 	path = "";
 	table_name = "";
 	files.clear();
 }
 
+// Inserisci il file specificato nella cartella
 void Folder::insert_file(File f) {
 	files.push_back(f);
 }
 
+// Crea nuova tabella nel DB relativa alla cartella
 bool Folder::create_table_folder() {
 
 	SQLite::Database db("database.db3", SQLITE_OPEN_READWRITE);
@@ -44,24 +48,30 @@ bool Folder::create_table_folder() {
 	}
 }
 
+// Fornisci i dati relativi ad una specifica cartella
 void Folder::get_folder_stat(int s_c) {
 
 	if (!isSelected()) {
 		throw runtime_error("si sta tentando di operare su una cartella senza averla selezionata");
 	}
 	int len;
-	char buf[MAX_BUF_LEN];
+	char buf[MAX_BUF_LEN+1];
 	try {
 		SQLite::Database db("database.db3", SQLITE_OPEN_READONLY);
 		// Comunicazione stato cartella nelle varie versioni:
+		// - Si invia il numero totale di versioni
 		// - Si inizia dalla versione minore (sempre la 1)
 		// - Si invia il numero di versione (1\r\n)
+		// - Seguito dal numero di file presenti nella versione
 		// - Seguito dai dati dei file inclusi in quel backup, uno per riga
 		// - Terminato l'invio per la prima versione si passa alla successiva (2)
 		// - n volte quante sono le versioni diverse
 		// Conto numero di versioni
 		int n_vers = db.execAndGet("SELECT COUNT (DISTINCT Versione_BCK) FROM '" + table_name + "';");
 		Logger::write_to_log("Invio informazioni relative al backup della cartella " + path + ", sono state trovate " + to_string(n_vers) + " versioni");
+		// Invio numero totale di versioni
+		sprintf(buf, "%d\r\n", n_vers);
+		send(s_c, buf, strlen(buf), 0);
 		for (int i = 1; i <= n_vers; i++) {
 			// Versione i
 			// Invio numero versione
@@ -70,15 +80,18 @@ void Folder::get_folder_stat(int s_c) {
 			string _query("SELECT File_CL, Last_Modif, Hash FROM '" + table_name + "' WHERE Versione_BCK = ?;");
 			SQLite::Statement query(db, _query);
 			query.bind(1, i);
-			// Dato il numero di backup = i inviare per ogni file:
 			int count = db.execAndGet("SELECT COUNT (*) FROM '" + table_name + "' WHERE Versione_BCK = " + to_string(i) + ";");
+			// Invio del numero di file per la versione corrente
+			sprintf(buf, "%d\r\n", count);
+			send(s_c, buf, strlen(buf), 0);
+			// Dato il numero di backup = i inviare per ogni file:
 			for (int j = 0; j < count; j++) {
 				query.executeStep();
 				string nome = query.getColumn("File_CL");
 				time_t timestamp = query.getColumn("Last_Modif");
 				string hash = query.getColumn("Hash");
 				// [Percorso completo]\r\n[Ultima modifica -> 8byte][Hash -> 32char]\r\n
-				int cur_file_len = nome.length() + 2/*\r\n*/+ 8 * /*Ultima modifica*/+32/*Hash*/+ 2/*\r\n*/+ 1/*\0*/;
+				int cur_file_len = nome.length() + 2/*\r\n*/+ 8 /*Ultima modifica*/+32/*Hash*/+ 2/*\r\n*/+ 1/*\0*/;
 				char cur_file[cur_file_len];
 				sprintf(cur_file, "%s\r\n%016lx%s\r\n", nome.c_str(), timestamp, hash.c_str());
 				/*string to_send(nome + "\r\n" + to_string(timestamp) + hash + "\r\n");*/
@@ -107,10 +120,12 @@ void Folder::get_folder_stat(int s_c) {
 	}
 }
 
+// Rimuovi i dati relativi ai file presenti nella cartella
 void Folder::remove_files() {
 	files.clear();
 }
 
+// Inserimento di un nuovo file nel backup corrente
 bool Folder::new_file_backup(int s_c) {
 
 	if (!isSelected()) {
@@ -171,11 +186,12 @@ bool Folder::new_file_backup(int s_c) {
 	}
 }
 
+// Ricezione di un nuovo file nella cartella
 bool Folder::receive_file(int s_c, int vrs, SQLite::Database& db, string folder_name) {
 
 	int len;
 	string filename;
-	char buffer[MAX_BUF_LEN] = "";
+	char buffer[MAX_BUF_LEN+1] = "";
 	char *file_info;
 	char _size_c[12 + 1] = "", hash[32 + 1] = "", _timestamp_c[16 + 1] = "";
 	size_t size;
@@ -255,31 +271,33 @@ bool Folder::receive_file(int s_c, int vrs, SQLite::Database& db, string folder_
 	}
 }
 
+// Copia delle voci relative all'ultima versione in una nuova versione con gli stessi file
 void Folder::SQL_copy_rows(SQLite::Database& db, int vrs) {
-//	CREATE TABLE 'temporary_table' AS SELECT * FROM '[nome_table]' WHERE Versione_BCK= ?;
+	// CREATE TABLE 'temporary_table' AS SELECT * FROM '[nome_table]' WHERE Versione_BCK= ?;
 	string table("temporary_table" + user.getUser());
 	string _query = "CREATE TABLE '" + table + "' AS SELECT * FROM '" + table_name + "' WHERE Versione_BCK= ?;";
 	SQLite::Statement query_1(db, _query);
 	query_1.bind(1, vrs);
 	query_1.exec();
-//	UPDATE 'temporary_table' SET Versione_BCK=(Versione_BCK+1);
+	// UPDATE 'temporary_table' SET Versione_BCK=(Versione_BCK+1);
 	_query = "UPDATE '" + table + "' SET Versione_BCK=(Versione_BCK+1);";
 	SQLite::Statement query_2(db, _query);
 	query_2.exec();
-//	UPDATE 'temporary_table' SET File_ID=NULL;
+	// UPDATE 'temporary_table' SET File_ID=NULL;
 	_query = "UPDATE '" + table + "' SET File_ID=NULL;";
 	SQLite::Statement query_3(db, _query);
 	query_3.exec();
-//	INSERT INTO '[nome_table]' SELECT * FROM 'temporary_table';
+	// INSERT INTO '[nome_table]' SELECT * FROM 'temporary_table';
 	_query = "INSERT INTO '" + table_name + "' SELECT * FROM '" + table + "';";
 	SQLite::Statement query_4(db, _query);
 	query_4.exec();
-//	DROP TABLE 'temporary_table';
+	// DROP TABLE 'temporary_table';
 	_query = "DROP TABLE '" + table + "';";
 	SQLite::Statement query_5(db, _query);
 	query_5.exec();
 }
 
+// Eliminazione di un file dal backup corrente
 bool Folder::delete_file_backup(int s_c) {
 	// Un file deve essere eliminato dal backup corrente:
 	// - Si trova la versione di backup corrente
@@ -340,6 +358,7 @@ bool Folder::delete_file_backup(int s_c) {
 	return false;
 }
 
+// Ricezione di un nuovo backup completo
 bool Folder::full_backup(int s_c) {
 
 	if (!isSelected()) {
@@ -417,11 +436,12 @@ bool Folder::full_backup(int s_c) {
 	}
 }
 
+// Invio di un backup completo
 void Folder::send_backup(int s_c) {
 
 	// Invio backup completo:
 	// - Si attende che l'utente selezioni la versione desiderata
-	char buffer[MAX_BUF_LEN];
+	char buffer[MAX_BUF_LEN+1];
 	// Versione
 	int len = recv(s_c, buffer, MAX_BUF_LEN, 0);
 	if ((len == 0) || (len == -1)) {
@@ -452,6 +472,7 @@ void Folder::send_backup(int s_c) {
 	}
 }
 
+// Invio di un singolo file da un backup
 void Folder::send_single_file(int s_c) {
 
 	// Invio file singolo da backup:
