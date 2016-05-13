@@ -90,7 +90,7 @@ void Folder::get_folder_stat(int s_c) {
 				string nome = query.getColumn("File_CL");
 				time_t timestamp = query.getColumn("Last_Modif");
 				string hash = query.getColumn("Hash");
-				// [Percorso completo]\r\n[Ultima modifica -> 8byte][Hash -> 32char]\r\n
+				// Invio: [Percorso completo]\r\n[Ultima modifica (16 char)][Hash (32 char)]\r\n
 				int cur_file_len = nome.length() + 2/*\r\n*/+ 8 /*Ultima modifica*/+32/*Hash*/+ 2/*\r\n*/+ 1/*\0*/;
 				char cur_file[cur_file_len];
 				sprintf(cur_file, "%s\r\n%016lx%s\r\n", nome.c_str(), timestamp, hash.c_str());
@@ -197,7 +197,7 @@ bool Folder::receive_file(int s_c, int vrs, SQLite::Database& db, string folder_
 	size_t size;
 	time_t timestamp;
 
-	// Ricezione: Nome completo file\r\n | Dimensione file (8 Byte) | Hash del file (16 Byte) | Timestamp (8 Byte)
+	// Ricezione: [Nome completo file]\r\n[Dimensione file (12 char)][Hash del file (32 char)][Timestamp (8 char)]\r\n
 	len = recv(s_c, buffer, MAX_BUF_LEN, 0);
 	if (len == 0 || len == -1) {
 		// Ricevuta stringa vuota: connessione persa
