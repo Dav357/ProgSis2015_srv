@@ -33,7 +33,6 @@
 #define SHORT_BUF_LEN 128
 #define COMM_LEN 8
 
-
 void send_command(int s_c, const char *command);
 bool add_to_usertable(std::string);
 void remove_from_usertable(std::string);

@@ -10,16 +10,18 @@
 
 bool full_backup(int, Folder&);
 
-class Backup{
+class Backup {
 private:
-	int vers;
-	bool complete;
-	Folder &folder;
+  int vers;
+  bool complete;
+  Folder &folder;
 public:
-	Backup(int, Folder&);
-	virtual ~Backup();
-	void completed();
-	bool isComplete(){return complete;};
+  Backup(int, Folder&);
+  virtual ~Backup();
+  void completed();
+  bool isComplete() {
+    return complete;
+  }
 };
 
 void db_maintenance(std::string);

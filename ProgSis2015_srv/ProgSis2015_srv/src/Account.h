@@ -12,27 +12,30 @@
 class Folder;
 
 // Classe per la gestione dell'account
-class Account{
-	std::string usr;
-	std::string shapass;
-	bool complete;
+class Account {
+  std::string usr;
+  std::string shapass;
+  bool complete;
 
 public:
-	Account();
-	Account(std::string, std::string);
-	void assign(std::string, std::string);
-	void assign_username(std::string);
-	void assign_username(char*);
-	void assign_password(std::string);
-	void assign_password(char*);
-	std::string getUser(){return usr;};
-	bool is_complete(){return complete;};
-	bool account_manag(int flag);
-	Folder select_folder(int);
-	void clear();
+  Account();
+  Account(std::string, std::string);
+  void assign(std::string, std::string);
+  void assign_username(std::string);
+  void assign_username(char*);
+  void assign_password(std::string);
+  void assign_password(char*);
+  std::string getUser() {
+    return usr;
+  }
+  bool is_complete() {
+    return complete;
+  }
+  bool account_manag(int flag);
+  Folder select_folder(int);
+  void clear();
 };
 
 Account login(int, char*);
-
 
 #endif /* ACCOUNT_H_ */

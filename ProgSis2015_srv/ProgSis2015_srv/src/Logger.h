@@ -21,15 +21,15 @@
 // Classe logger, per una gestione più semplice delle comunicazioni dal processo
 class Logger {
 public:
-	Logger(std::string);
-	static void reopen_log(std::string);
-	static void write_to_log(std::string msg, int type = DEBUG, int scope = LOG_AND_CONSOLE) ;
-	virtual ~Logger();
+  Logger(std::string);
+  static void reopen_log(std::string);
+  static void write_to_log(std::string msg, int type = DEBUG, int scope = LOG_AND_CONSOLE);
+  virtual ~Logger();
 
 private:
 
-	static struct timeval start_program_time;
-	static std::ofstream general_log;
+  static struct timeval start_program_time;
+  static std::ofstream general_log;
 };
 
 #endif /* LOGGER_H_ */
