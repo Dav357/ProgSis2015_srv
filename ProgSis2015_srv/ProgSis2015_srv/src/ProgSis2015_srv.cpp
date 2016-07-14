@@ -61,14 +61,15 @@ static void Initialize() {
   m_CommandsValues["SET_FOLD"] = Select_folder;
   m_CommandsValues["CLR_FOLD"] = Clear_folder;
   m_CommandsValues["REC_FILE"] = Receive_file;
+
   m_CommandsValues["SYNC_RCV"] = Receive_full_backup;
   m_CommandsValues["FLD_STAT"] = Get_current_folder_status;
   m_CommandsValues["NEW_FILE"] = New_file_current_backup;
   m_CommandsValues["UPD_FILE"] = Alter_file_current_backup;
   m_CommandsValues["DEL_FILE"] = Del_file_current_backup;
-
   m_CommandsValues["SYNC_SND"] = Send_full_backup;
   m_CommandsValues["FILE_SND"] = Send_single_file;
+
   m_CommandsValues["LOGOUT__"] = Logout;
   Logger::write_to_log("Mappa dei comandi inizializzata correttamente, numero di elementi presenti: " + to_string(m_CommandsValues.size()), DEBUG, LOG_ONLY);
 }

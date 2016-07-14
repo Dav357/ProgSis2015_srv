@@ -133,7 +133,7 @@ bool File::hash_check(int fpoint) {
   }
   MD5_Final(hash, &c);
   for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
-    sprintf(hash_str + (2 * i), "%02x", hash[i]);
+    sprintf(hash_str + (2 * i), "%02X", hash[i]);
   }
   string local_md5(hash_str);
   Logger::write_to_log("File " + filename + ": MD5 ricevuto: " + remote_md5 + ", MD5 calcolato: " + local_md5);

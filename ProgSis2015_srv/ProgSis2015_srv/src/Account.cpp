@@ -184,6 +184,34 @@ Account login(int s_c, char *usertable) {
         return ac;
       } else {
         send_command(s_c, "LOGINERR");
+        buffer[0] = '\0'; comm[0] = '\0';
+        len = recv(s_c, comm, COMM_LEN, 0);
+        if ((len == 0) || (len == -1)) {
+          // Ricevuta stringa vuota: connessione persa
+          throw runtime_error("connessione persa");
+        }
+        comm[len] = '\0';
+        if (!strcmp(comm, "CREATEAC")) {
+          Logger::write_to_log("Creazione nuovo account in corso, in attesa dei dati di accesso");
+          // Ricezione "[username]\r\n[sha-256_password]\r\n"
+          len = recv(s_c, buffer, MAX_BUF_LEN, 0);
+          if ((len == 0) || (len == -1)) {
+            // Ricevuta stringa vuota: connessione persa
+            throw runtime_error("connessione persa");
+          }
+          buffer[len] = '\0';
+          // Inserimento in stringhe di username...
+          buf = strtok(buffer, "\r\n");
+          ac.assign_username(buf);
+          // ... e dell'SHA-256 della password
+          buf = strtok(NULL, "\r\n");
+          ac.assign_password(buf);
+          if (ac.account_manag(CREATEACC)) {
+            send_command(s_c, "LOGGEDOK");
+            Logger::write_to_log("Utente " + ac.getUser() + " connesso");
+            return ac;
+          }
+        }
         return (Account());
       }
     } else {

@@ -11,7 +11,7 @@ using namespace std;
 
 // Costruttore
 Folder::Folder(string p, Account& user) :
-    user(user) {
+        user(user) {
 
   string tmp("table_" + user.getUser() + "_" + p);
   path = p;
@@ -36,7 +36,7 @@ bool Folder::create_table_folder() {
   SQLite::Database db("database.db3", SQLITE_OPEN_READWRITE);
   string _query(
       "CREATE TABLE [" + table_name
-          + "] (File_ID INTEGER PRIMARY KEY AUTOINCREMENT, File_CL TEXT NOT NULL, Last_Modif INTEGER (8) NOT NULL, File_SRV TEXT NOT NULL,  Hash STRING (32), Versione_BCK INTEGER (2));");
+      + "] (File_ID INTEGER PRIMARY KEY AUTOINCREMENT, File_CL TEXT NOT NULL, Last_Modif INTEGER (8) NOT NULL, File_SRV TEXT NOT NULL,  Hash STRING (32), Versione_BCK INTEGER (2));");
   SQLite::Statement query(db, _query);
 
   if (query.exec() == 0) {
@@ -138,9 +138,12 @@ bool Folder::new_file_backup(int s_c) {
     SQLite::Database db("database.db3", SQLITE_OPEN_READWRITE);
     string _query("SELECT MAX(Versione_BCK) FROM '" + table_name + "';");
     SQLite::Statement query(db, _query);
-    if (query.executeStep()) {
-      // Un risultato = corretto, si aggiunge all'ultimo backup
-      vrs = query.getColumn(0).getInt() + 1;
+    query.executeStep();
+    vrs = query.getColumn(0);
+    // Risultato =/= 0 -> corretto, si aggiunge all'ultimo backup
+    if (vrs != 0) {
+      vrs += 1;
+      send_command(s_c, "BACKUPOK");
     } else {
       // Non esiste un backup completo corrente -> Errore
       Logger::write_to_log("Si sta tentando di aggiungere un file senza avere un backup completo", ERROR);
@@ -235,7 +238,7 @@ bool Folder::receive_file(int s_c, int vrs, SQLite::Database& db, string folder_
     string _query("DELETE FROM '" + table_name + "' WHERE Versione_BCK=" + to_string(vrs) + " AND File_CL='" + file.getName() + "';");
     SQLite::Statement query(db, _query);
     Logger::write_to_log("File: " + file.getFullPath() + ", Dimensione: " + to_string(file.getSize()) + " Byte, MD5: " + string(file.getHash()) + ", Timestamp: " + to_string(file.getTimestamp()),
-    DEBUG, LOG_ONLY);
+        DEBUG, LOG_ONLY);
     if (query.exec() == 0) {
       // Non è un aggiornamento, ma un inserimento
       Logger::write_to_log("Il file non è un aggiornamento, ma un file nuovo", DEBUG, LOG_ONLY);
@@ -368,7 +371,7 @@ bool Folder::full_backup(int s_c) {
   char comm[COMM_LEN];
 
   // Creazione nuova versione backup nel DB
-  // 		// Lettura versione attuale
+  // Lettura versione attuale
   try {
     SQLite::Database db("database.db3", SQLITE_OPEN_READWRITE);
     string _query("SELECT MAX(Versione_BCK) FROM '" + table_name + "';");
@@ -389,7 +392,7 @@ bool Folder::full_backup(int s_c) {
     string folder_name("./ReceivedFiles/" + user.getUser() + "_" + path + "_FullBackup_" + to_string(time(NULL)));
 
     // Attesa comando: 	- se REC_FILE -> nuovo file in arrivo
-    //					- se SYNC_END -> fine backup
+    //					        - se SYNC_END -> fine backup
     while (1) {
       len = recv(s_c, comm, COMM_LEN, 0);
       if ((len == 0) || (len == -1)) {
