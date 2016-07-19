@@ -41,7 +41,12 @@ enum StringValue {
 static map<string, StringValue> m_CommandsValues;
 // Puntatore per mmap
 char *usertable = NULL;
+int glob_sock = -1;
 sem_t *sem_usertable = NULL;
+
+/*
+ * SEGNALI
+ */
 
 // Gestore segnale di terminazione figlio
 void child_handler(int param) {
@@ -51,6 +56,14 @@ void child_handler(int param) {
     Logger::write_to_log("Il processo figlio [" + to_string(pid) + "] è terminato", DEBUG, LOG_ONLY);
   }
   signal(SIGCHLD, child_handler);
+}
+
+// Gestore segnale di terminazione processo
+void term_handler(int param) {
+
+  Logger::write_to_log("Terminazione anomala del processo, chiusura socket", ERROR);
+  close(glob_sock);
+  exit(EXIT_FAILURE);
 }
 
 void server_function(int, int);
@@ -142,6 +155,11 @@ int main(int argc, char** argv) {
     Logger::write_to_log("Errore nell'istanziamento del gestore del segnale di terminazione dei processi figli", ERROR);
   }
   Logger::write_to_log("Gestore del segnale di terminazione dei processi figli istanziato correttamente", DEBUG, LOG_ONLY);
+  glob_sock = s;
+  if (((signal(SIGINT, term_handler)) == SIG_ERR) || (signal(SIGTERM, term_handler) == SIG_ERR)) {
+    Logger::write_to_log("Errore nell'istanziamento del gestore del segnale di terminazione del processo principale", ERROR);
+  }
+  Logger::write_to_log("Gestore del segnale di terminazione del processo principale istanziato correttamente", DEBUG, LOG_ONLY);
   for (;;) {
     /* Padre: in attesa di connessioni */
     Logger::write_to_log("In attesa di connessioni");
@@ -273,6 +291,7 @@ void server_function(int s_c, int pid) {
   ac.clear();
   close(s_c);
   for (string table : used_tables) {
+    Logger::write_to_log("Pulizia database e cartella file ricevuti in corso");
     db_maintenance(table);
   }
   return;

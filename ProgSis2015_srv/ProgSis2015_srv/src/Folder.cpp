@@ -68,7 +68,7 @@ void Folder::get_folder_stat(int s_c) {
     // - n volte quante sono le versioni diverse
     // Conto numero di versioni
     int n_vers = db.execAndGet("SELECT COUNT (DISTINCT Versione_BCK) FROM '" + table_name + "';");
-    Logger::write_to_log("Invio informazioni relative al backup della cartella " + path + ", sono state trovate " + to_string(n_vers) + " versioni");
+    Logger::write_to_log("Invio informazioni relative al backup della cartella " + path + ", numero di versioni: " + to_string(n_vers));
     // Invio numero totale di versioni
     sprintf(buf, "%d\r\n", n_vers);
     send(s_c, buf, strlen(buf), 0);
@@ -77,7 +77,7 @@ void Folder::get_folder_stat(int s_c) {
       // Invio numero versione
       sprintf(buf, "%d\r\n", i);
       send(s_c, buf, strlen(buf), 0);
-      string _query("SELECT File_CL, Last_Modif, Hash FROM '" + table_name + "' WHERE Versione_BCK = ?;");
+      string _query("SELECT File_CL, Last_Modif, Hash, File_SRV FROM '" + table_name + "' WHERE Versione_BCK = ?;");
       SQLite::Statement query(db, _query);
       query.bind(1, i);
       int count = db.execAndGet("SELECT COUNT (*) FROM '" + table_name + "' WHERE Versione_BCK = " + to_string(i) + ";");
@@ -90,12 +90,16 @@ void Folder::get_folder_stat(int s_c) {
         string nome = query.getColumn("File_CL");
         time_t timestamp = query.getColumn("Last_Modif");
         string hash = query.getColumn("Hash");
-        // Invio: [Percorso completo]\r\n[Ultima modifica (16 char)][Hash (32 char)]\r\n
-        int cur_file_len = nome.length() + 2/*\r\n*/+ 8 /*Ultima modifica*/+ 32/*Hash*/+ 2/*\r\n*/+ 1/*\0*/;
-        char cur_file[cur_file_len];
-        sprintf(cur_file, "%s\r\n%016lx%s\r\n", nome.c_str(), timestamp, hash.c_str());
+        string local_file = query.getColumn("File_SRV");
+        File file(nome, (*this), hash, local_file);
+        string full_path_file = file.getFullPath();
+        Logger::write_to_log("Invio informazioni relative al file: " + full_path_file, DEBUG, CONSOLE_ONLY);
+        // Invio: [Nome file]\r\n[Ultima modifica (16 char)][Hash (32 char)]\r\n
+        int cur_file_len = full_path_file.length() + 2/*\r\n*/+ 16 /*Ultima modifica*/+ 32/*Hash*/+ 2/*\r\n*/+ 1/*\0*/;
+        char cur_file[cur_file_len] = "";
+        sprintf(cur_file, "%s\r\n%016lX%s\r\n", full_path_file.c_str(), timestamp, hash.c_str());
         /*string to_send(nome + "\r\n" + to_string(timestamp) + hash + "\r\n");*/
-        send(s_c, cur_file, cur_file_len, 0);
+        send(s_c, cur_file, cur_file_len-1, 0);
         len = recv(s_c, buf, COMM_LEN, 0);
         if ((len == 0) || (len == -1)) {
           // Ricevuta stringa vuota: connessione persa
@@ -106,12 +110,15 @@ void Folder::get_folder_stat(int s_c) {
           Logger::write_to_log("Informazioni file ricevute dal client", DEBUG, CONSOLE_ONLY);
         } else {
           throw runtime_error("ricevuto comando sconosciuto");
-
         }
       }
       Logger::write_to_log("Informazioni relative alla versione " + to_string(i) + " inviate correttamente", DEBUG, CONSOLE_ONLY);
     }
-    Logger::write_to_log("Informazioni relative alla cartella " + path + " inviate correttamente");
+    if (n_vers == 0){
+      Logger::write_to_log("Nessuna versione trovata per la cartella " + path);
+    } else {
+      Logger::write_to_log("Informazioni relative alla cartella " + path + " inviate correttamente");
+    }
     return;
   } catch (SQLite::Exception& e) {
     Logger::write_to_log("Errore DB: " + string(e.what()), ERROR);

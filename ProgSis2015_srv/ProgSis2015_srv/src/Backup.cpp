@@ -10,9 +10,11 @@
 #include "Backup.h"
 using namespace std;
 
-// Contruttore
+void del_empty_fold();
+
+// Costruttore
 Backup::Backup(int v, Folder& f) :
-    vers(v), complete(false), folder(f) {
+        vers(v), complete(false), folder(f) {
 }
 
 // Distruttore
@@ -73,6 +75,7 @@ void db_maintenance(string table_name) {
     // Si cancellano le righe relative alle vecchie versioni
     if (db.exec("DELETE FROM '" + table_name + "' WHERE Versione_BCK < " + to_string(min_vers) + " ;") == 0) {
       Logger::write_to_log("Database non aggiornato", DEBUG, LOG_ONLY);
+      del_empty_fold();
       return;
     }
     Logger::write_to_log("Righe rimosse correttamente", DEBUG, LOG_ONLY);
@@ -90,13 +93,16 @@ void db_maintenance(string table_name) {
       Logger::write_to_log("Numero di versione aggiornato correttamente", DEBUG, LOG_ONLY);
     }
 
-    // Si eliminano le cartelle vuote rimaste
-    system("find ./ReceivedFiles -empty -type d -delete");
-    Logger::write_to_log("Eliminate cartelle vuote", DEBUG, LOG_ONLY);
-
+    del_empty_fold();
     Logger::write_to_log("Pulizia del DB terminata");
 
   } catch (SQLite::Exception& e) {
     Logger::write_to_log("Errore DB: " + string(e.what()), ERROR);
   }
+}
+
+void del_empty_fold() {
+  // Si eliminano le cartelle vuote rimaste
+  system("find ./ReceivedFiles/ -empty -type d -delete");
+  Logger::write_to_log("Eliminate cartelle vuote", DEBUG, LOG_ONLY);
 }
