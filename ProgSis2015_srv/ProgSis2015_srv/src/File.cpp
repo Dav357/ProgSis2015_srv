@@ -93,7 +93,11 @@ bool File::receive_file_data(int s_c, string folder_name) {
     //Loop di lettura bytes inviati dal client
     int rbyte = 0;
     size_t received = 0;
-    for (rbyte = recv(s_c, buffer, MAX_BUF_LEN, 0); ((rbyte != 0) && (rbyte != -1)); rbyte = recv(s_c, buffer, MAX_BUF_LEN, 0)) {
+    for (;;) {
+      rbyte = recv(s_c, buffer, MAX_BUF_LEN, 0);
+      if (rbyte == 0 || rbyte == -1)
+        break;
+        //throw runtime_error("connessione persa");
       write(fpoint, buffer, rbyte);
       received += rbyte;
       if (received == size) {

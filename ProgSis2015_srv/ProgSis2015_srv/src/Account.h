@@ -31,11 +31,11 @@ public:
   bool is_complete() {
     return complete;
   }
-  bool account_manag(int flag);
+  char account_manag(int flag);
   Folder select_folder(int);
   void clear();
 };
 
-Account login(int, char*);
+Account login(int, char*, int rec = 0);
 
 #endif /* ACCOUNT_H_ */

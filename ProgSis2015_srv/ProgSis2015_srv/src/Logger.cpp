@@ -41,11 +41,11 @@ void Logger::write_to_log(std::string msg, int type, int scope) {
 
   switch (type) {
     case DEBUG:
-      pref.assign("DEBUG");
+      pref.assign(" - DEBUG - ");
       target = &cout;
     break;
     case ERROR:
-      pref.assign("ERROR");
+      pref.assign(" X ERROR X ");
       target = &cerr;
     break;
   }
@@ -59,11 +59,11 @@ void Logger::write_to_log(std::string msg, int type, int scope) {
       strftime(buffer, BUF_LEN, "%H:%M:%S.", time_info);
       general_log << "[" << buffer;
       sprintf(buffer, "%03ld", now.tv_usec / 1000);
-      general_log << buffer << "] - " << pref << " - " << msg << endl;
+      general_log << buffer << "]" << pref << msg << endl;
       if (scope == LOG_ONLY) break;
       //no break
     case CONSOLE_ONLY:
-      (*target) << ("- " + msg) << endl;
+      (type == DEBUG) ? ((*target) << ("- ")) : ((*target) << ("❌ ")) << msg << endl;
   }
 }
 

@@ -44,29 +44,31 @@ char *usertable = NULL;
 int glob_sock = -1;
 sem_t *sem_usertable = NULL;
 
-/*
- * SEGNALI
- */
-
+/* SEGNALI */
 // Gestore segnale di terminazione figlio
 void child_handler(int param) {
 
   pid_t pid;
   while ((pid = waitpid((pid_t) (-1), NULL, WNOHANG)) > 0) {
-    Logger::write_to_log("Il processo figlio [" + to_string(pid) + "] è terminato", DEBUG, LOG_ONLY);
+    Logger::write_to_log("Il processo figlio [" + to_string(pid) + "] è terminato", DEBUG);
   }
   signal(SIGCHLD, child_handler);
 }
-
 // Gestore segnale di terminazione processo
 void term_handler(int param) {
 
-  Logger::write_to_log("Terminazione anomala del processo, chiusura socket", ERROR);
+  Logger::write_to_log("Terminazione del processo, chiusura socket");
   close(glob_sock);
   exit(EXIT_FAILURE);
 }
+/* FINE SEGNALI */
 
 void server_function(int, int);
+void server_management();
+void user_list();
+void table_listing();
+void user_removal();
+void server_wipe();
 
 // Inizializzazione della mappa dei comandi
 static void Initialize() {
@@ -101,11 +103,14 @@ int main(int argc, char** argv) {
   Initialize();
 
   if (argc != 2) {
-    Logger::write_to_log("Errore nei parametri, formato corretto: <nome eseguibile> <porta>", ERROR);
+    Logger::write_to_log("Errore nei parametri, formato corretto: <nome eseguibile> <porta> o <nome eseguibile> -m", ERROR);
     return (-1);
   }
 
-  port = atoi(argv[1]);
+  if (!strcmp(argv[1], "-m"))
+    server_management();
+  else
+    port = atoi(argv[1]);
   // Creazione socket
   if ((s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
     Logger::write_to_log("Errore nella creazione del socket, chiusura programma", ERROR);
@@ -224,55 +229,55 @@ void server_function(int s_c, int pid) {
           } else {
             Logger::write_to_log("Errore nella selezione della cartella", ERROR);
           }
-        break;
+          break;
         case Clear_folder:
           comm[0] = '\0';
           Logger::write_to_log("Ricevuto comando 'deseleziona cartella'");
           send_command(s_c, "CMND_REC");
           f.clear_folder();
           Logger::write_to_log("Cartella deselezionata");
-        break;
+          break;
         case Get_current_folder_status:
           comm[0] = '\0';
           Logger::write_to_log("Ricevuto comando 'stato corrente della cartella'");
           send_command(s_c, "CMND_REC");
           f.get_folder_stat(s_c);
-        break;
+          break;
         case Receive_full_backup:
           Logger::write_to_log("Ricevuto comando 'backup cartella completo'");
           send_command(s_c, "CMND_REC");
           f.full_backup(s_c);
-        break;
+          break;
         case New_file_current_backup:
           comm[0] = '\0';
           Logger::write_to_log("Ricevuto comando 'nuovo file nel backup corrente'");
           send_command(s_c, "CMND_REC");
           f.new_file_backup(s_c);
-        break;
+          break;
         case Alter_file_current_backup:
           comm[0] = '\0';
           Logger::write_to_log("Ricevuto comando 'modifica file nel backup corrente'");
           send_command(s_c, "CMND_REC");
           f.new_file_backup(s_c);
-        break;
+          break;
         case Del_file_current_backup:
           comm[0] = '\0';
           Logger::write_to_log("Ricevuto comando 'elimina file da backup corrente'");
           send_command(s_c, "CMND_REC");
           f.delete_file_backup(s_c);
-        break;
+          break;
         case Send_full_backup:
           comm[0] = '\0';
           Logger::write_to_log("Ricevuto comando 'invia backup completo'");
           send_command(s_c, "CMND_REC");
           f.send_backup(s_c);
-        break;
+          break;
         case Send_single_file:
           comm[0] = '\0';
           Logger::write_to_log("Ricevuto comando 'invia singolo file dal backup'");
           send_command(s_c, "CMND_REC");
           f.send_single_file(s_c);
-        break;
+          break;
         case Logout:
           comm[0] = '\0';
           Logger::write_to_log("Ricevuto comando 'logout'");
@@ -280,7 +285,7 @@ void server_function(int s_c, int pid) {
           send_command(s_c, "CMND_REC");
           ac.clear();
           Logger::write_to_log("Disconnessione effettuata");
-        break;
+          break;
         default:
           throw runtime_error("ricevuto comando sconosciuto");
       }
@@ -302,6 +307,7 @@ void send_command(int s_c, const char *command) {
   send(s_c, command, COMM_LEN, 0);
 }
 
+/* GESTIONE USERTABLE */
 // Aggiunta di un utente alla lista degli utenti attualmente connessi
 bool add_to_usertable(string user) {
 
@@ -332,13 +338,13 @@ bool add_to_usertable(string user) {
   return false;
 
 }
-
 // Rimozione di un utente dalla lista degli utenti attualmente connessi
 void remove_from_usertable(string user) {
 
   // Eliminare un utente dall'elenco utenti:
   vector<string> users;
   string line;
+  char mod = 0;
   // Si scorre l'elenco degli utenti
   sem_wait(sem_usertable);
   for (int i = 0; i < MMAP_SIZE; i += MMAP_LINE_SIZE) {
@@ -351,6 +357,7 @@ void remove_from_usertable(string user) {
       break;
     } else if (!line.compare(user)) {
       //  Se la linea attuale contiene l'utente da eliminare, si prosegue con l'iterazione successiva
+      mod = 1;
       continue;
     }
     // Altrimenti si salva l'utente corrente nel vettore di stringhe
@@ -363,5 +370,169 @@ void remove_from_usertable(string user) {
     i += MMAP_LINE_SIZE;
   }
   sem_post(sem_usertable);
-  Logger::write_to_log("Elenco di utenti connessi aggiornato, utente " + user + " rimosso");
+  if (mod == 1)
+    Logger::write_to_log("Elenco di utenti connessi aggiornato, utente " + user + " rimosso");
+  else
+    Logger::write_to_log("Nessuna modifica all'elenco di utenti connessi", DEBUG, LOG_ONLY);
 }
+/* FINE GESTIONE USERTABLE */
+
+/* FUNZIONI MANUTENZIONE SERVER */
+// Funzione principale di manutenzione del server
+void server_management() {
+
+  char comm = 'c', comm_reset = 'n';
+  char exit_flag = 0;
+  cout << "Comandi disponibili:" << endl << "- Elenco [U]tenti" << endl << "- Elenco [T]abelle nel Database" << endl << "- [E]limina utente" << endl << "- [A]zzera contenuto server" << endl
+      << "- Us[C]ita" << endl;
+  for (; exit_flag == 0;) {
+    cout << "Comando: ";
+    cin >> comm;
+    switch (comm) {
+      case 'u':
+      case 'U':
+        user_list();
+        break;
+      case 't':
+      case 'T':
+        table_listing();
+        break;
+      case 'e':
+      case 'E':
+        user_removal();
+        break;
+      case 'a':
+      case 'A':
+        // Richiesta conferma
+        cout << "VUOI DAVVERO ELIMINARE COMPLETAMENTE I DATI CONTENUTI NEL SERVER? S/[N]: ";
+        cin >> comm_reset;
+        switch (comm_reset) {
+          case 's':
+          case 'S':
+            server_wipe();
+            break;
+          default:
+            cout << "Annullamento" << endl;
+        }
+        break;
+      case 'c':
+      case 'C':
+        exit_flag = 1;
+        cout << "Uscita" << endl;
+        break;
+      default:
+        cout << "Comando sconosciuto: " << comm << endl;
+        break;
+    }
+  }
+  exit(EXIT_SUCCESS);
+}
+
+// Elenco utenti
+void user_list() {
+
+  try {
+    SQLite::Database db("database.db3");
+    string _query = "SELECT username FROM users ORDER BY user_id;";
+    SQLite::Statement query(db, _query);
+    bool r = query.executeStep();
+    if (r)
+      cout << "■ Elenco utenti, per ordine di iscrizione: " << endl;
+    else
+      cout << "■ Nessun utente presente " << endl;
+    for (; r != false; r = query.executeStep())
+      cout << query.getColumn(0) << endl;
+  } catch (SQLite::Exception& e) {
+    cerr << "❌ Errore nell'accesso al DB: " << e.what() << endl << "❌ Operazione non eseguita." << endl;
+  }
+}
+
+// Elenco tabelle relative al server
+void table_listing() {
+
+  try {
+    SQLite::Database db("database.db3", SQLITE_OPEN_READWRITE);
+    string _query = "SELECT name FROM sqlite_master WHERE type='table' AND name <> 'sqlite_sequence' ORDER BY name;";
+    SQLite::Statement query(db, _query);
+    cout << "■ Elenco tabelle presenti nel database: " << endl;
+    for (bool r = query.executeStep(); r != false; r = query.executeStep())
+      cout << query.getColumn(0) << endl;
+  } catch (SQLite::Exception& e) {
+    cerr << "❌ Errore nel Database: " << e.what() << endl << "❌ Operazione non eseguita." << endl;
+  }
+}
+
+// Rimozione utente e relative cartelle
+void user_removal() {
+  //TODO Finire implementazione funzione
+  // Eliminazione utente e relativi contenuti:
+  // - Si richiede l'utente da eliminare
+  // - Si elimina l'entry dell'utente da 'users'
+  // - Si individuano le tabelle dell'utente e si eliminano;
+  // -- Si legge l'elenco delle tabelle
+  // -- Si individuano quelle che contengono il nome all'utente cercato
+  // -- Si eliminano le tabelle trovate
+  // - Si individuano le cartelle dell'utente e si eliminano
+  string user_to_delete;
+  vector<string> tables_list;
+  vector<string> tables_to_delete;
+  // Richiesta utente da eliminare
+  cout << "Utente da eliminare? ";
+  cin.clear();
+  cin.ignore(numeric_limits<streamsize>::max(), '\n');
+  getline(cin, user_to_delete);
+  try {
+    SQLite::Database db("database.db3", SQLITE_OPEN_READWRITE);
+    // Eliminazione entry relativa all'utente dalla tabella 'users'
+    if (SQLite::Statement(db, "DELETE FROM 'users' WHERE username='" + user_to_delete + "';").exec() == 1) {
+      cout << "Utente " << user_to_delete << " rimosso dalla tabella utenti" << endl;
+    } else {
+      cout << "Utente " << user_to_delete << " non trovato, uscita" << endl;
+      return;
+    }
+    // Ricerca tabelle relative all'utente da eliminare
+    string _query = "SELECT name FROM sqlite_master WHERE type='table' AND name <> 'sqlite_sequence' ORDER BY name;";
+    SQLite::Statement query(db, _query);
+    for (bool r = query.executeStep(); r != false; r = query.executeStep())
+      tables_list.push_back(query.getColumn(0));
+    for (string t : tables_list)
+      if (t.find(string("_" + user_to_delete + "_")) != string::npos) tables_to_delete.push_back(t);
+    for (string t_e : tables_to_delete)
+      SQLite::Statement(db, "DROP TABLE '" + t_e + "';").exec();
+    cout << "Rimossi riferimenti alle cartelle dell'utente " + user_to_delete + " dal database" << endl;
+    //TODO Eliminazione cartelle relative all'utente da eliminare
+  } catch (SQLite::Exception& e) {
+    cerr << "❌ Errore nell'accesso al DB: " << e.what() << endl << "❌ Operazione non eseguita." << endl;
+  }
+}
+
+// Eliminazione contenuto del server
+void server_wipe() {
+  // Azzeramento contenuto del server:
+  // - Si eliminano tutte le tabelle eccetto 'users'
+  // - Si eliminano tutte le entry da 'users'
+  // - Si eliminano interamente il contenuto dalla cartella ReceivedFiles (eccetto la cartella stessa)
+  try {
+    vector<string> to_delete_list;
+    SQLite::Database db("database.db3", SQLITE_OPEN_READWRITE);
+    // Eliminazione tabelle eccetto 'users'
+    string _query = "SELECT name FROM sqlite_master WHERE type='table' AND name <> 'sqlite_sequence' AND name <> 'users' ORDER BY name;";
+    SQLite::Statement query(db, _query);
+    for (bool r = query.executeStep(); r != false; r = query.executeStep()) {
+      to_delete_list.push_back(query.getColumn(0));
+    }
+    for (string t : to_delete_list) {
+      SQLite::Statement(db, "DROP TABLE '" + t + "';").exec();
+    }
+    cout << "Tabelle delle cartelle eliminate" << endl;
+    // Eliminazione entry da 'users'
+    SQLite::Statement(db, "DELETE FROM 'users'").exec();
+    cout << "Tabella 'users' azzerata" << endl;
+    // Eliminazione sotto-cartelle di ReceivedFiles
+    system("rm -rf ./ReceivedFiles/*");
+    cout << "Svuotata cartella con i file ricevuti" << endl;
+  } catch (SQLite::Exception& e) {
+    cerr << "❌ Errore nel Database: " << e.what() << endl << "❌ Operazione non eseguita." << endl;
+  }
+}
+/*FINE FUNZIONI MANUTENZIONE SERVER */

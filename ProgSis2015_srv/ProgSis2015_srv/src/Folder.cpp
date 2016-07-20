@@ -343,21 +343,24 @@ bool Folder::delete_file_backup(int s_c) {
       throw runtime_error("connessione persa");
     }
     buffer[len] = '\0';
-    Logger::write_to_log("File da eliminare: " + string(buffer));
+    string filename = string(buffer).substr(path.length()+1, string::npos);
+    Logger::write_to_log("File da eliminare: " + filename);
     send_command(s_c, "INFO_OK_");
     _query.assign("DELETE FROM '" + table_name + "' WHERE File_CL = ? AND Versione_BCK = ?;");
     SQLite::Statement query_1(db, _query);
-    query_1.bind(1, buffer);
+    query_1.bind(1, filename);
     query_1.bind(2, vrs);
     // - Nella versione nuova si elimina il file richiesto
     if (query_1.exec() == 1) {
       // Eliminazione corretta di UNA SOLA riga
       trs.commit();
       Logger::write_to_log("File rimosso correttamente dal backup corrente");
+      send_command(s_c, "DELETED_");
       return true;
     } else {
       // Eliminazione di nessuna riga della tabella
       Logger::write_to_log("File non esistente", ERROR);
+      send_command(s_c, "NOT_DEL_");
       return false;
     }
   } catch (SQLite::Exception& e) {
@@ -396,11 +399,11 @@ bool Folder::full_backup(int s_c) {
 
     Backup backup(vrs, (*this));
     SQLite::Transaction trs(db);
-    string folder_name("./ReceivedFiles/" + user.getUser() + "_" + path + "_FullBackup_" + to_string(time(NULL)));
+    string folder_name("./ReceivedFiles/" + user.getUser() + "_" + path + "_FBck_" + to_string(time(NULL)));
 
     // Attesa comando: 	- se REC_FILE -> nuovo file in arrivo
     //					        - se SYNC_END -> fine backup
-    while (1) {
+    for (;;) {
       len = recv(s_c, comm, COMM_LEN, 0);
       if ((len == 0) || (len == -1)) {
         // Ricevuta stringa vuota: connessione persa
@@ -496,6 +499,8 @@ void Folder::send_single_file(int s_c) {
   buffer[len] = '\0'; // -> es. buffer: "file.txt\r\n1\0"
   string file_req = strtok(buffer, "\r\n"); // -> es. file_req = "file.txt"
   int vrs = strtol((strtok(NULL, "\r\n")), NULL, 10); // -> es. vrs = 1
+  string filename = string(buffer).substr(path.length()+1, string::npos);
+  Logger::write_to_log("Richiesto file " + filename + ", dalla versione " + to_string(vrs));
   // - Si spedisce il file richiesto
   try {
     SQLite::Database db("database.db3");

@@ -163,7 +163,7 @@ namespace SQLite {
         throw SQLite::Exception(sqlite3_errstr(ret));
       }
     } else {
-      throw SQLite::Exception("Statement needs to be reseted.");
+      throw SQLite::Exception("Statement needs to be reset.");
     }
 
     return mbOk; // true only if one row is accessible by getColumn(N)

@@ -4,6 +4,12 @@
 
 using namespace std;
 
+enum loginReturnValues {
+  TRUE,
+  FALSE,
+  EXISTING
+};
+
 /* Costruttori */
 
 // Costruttore parziale, per inizializzazione
@@ -63,7 +69,7 @@ void Account::clear() {
 }
 
 // Gestione account: login/creazione
-bool Account::account_manag(int flags) {
+char Account::account_manag(int flags) {
   // flags vale:
   // - 0x01 per login (equivale a DB in sola lettura)
   // - 0x02 per creazione account (DB in lettura/scrittura)
@@ -82,20 +88,26 @@ bool Account::account_manag(int flags) {
   if (flags == LOGIN) {
     if (query.executeStep()) {
       Logger::write_to_log("Account " + usr + " trovato");
-      return (add_to_usertable(usr));
+      if (!add_to_usertable(usr))
+        return EXISTING;
+      else
+        return TRUE;
     } else {
-      Logger::write_to_log("Account " + usr + " non trovato");
+      Logger::write_to_log("Combinazione username/password per " + usr + " non trovata");
       clear();
-      return false;
+      return FALSE;
     }
   } else {
     if (query.exec() == 1) {
       Logger::write_to_log("Account " + usr + " creato con successo, utente connesso");
-      return (add_to_usertable(usr));
+      if (!add_to_usertable(usr))
+        return EXISTING;
+      else
+        return TRUE;
     } else {
       Logger::write_to_log("Errore nella creazione dell'account", ERROR);
       clear();
-      return false;
+      return FALSE;
     }
   }
 }
@@ -143,7 +155,7 @@ Folder Account::select_folder(int s_c) {
 }
 
 // Funzione di login
-Account login(int s_c, char *usertable) {
+Account login(int s_c, char *usertable, int rec) {
 
   int len, flags;
   char *buf;
@@ -174,45 +186,29 @@ Account login(int s_c, char *usertable) {
       buf = strtok(NULL, "\r\n");
       ac.assign_password(buf);
       if (!strcmp(comm, "LOGIN___")) {
-        flags = LOGIN;
+        if (rec == 0)
+          flags = LOGIN;
+        else {
+          send_command(s_c, "LOGINERR");
+          return (Account());
+        }
       } else {
         flags = CREATEACC;
       }
-      if (ac.account_manag(flags)) {
-        send_command(s_c, "LOGGEDOK");
-        Logger::write_to_log("Utente " + ac.getUser() + " connesso");
-        return ac;
-      } else {
-        send_command(s_c, "LOGINERR");
-        buffer[0] = '\0'; comm[0] = '\0';
-        len = recv(s_c, comm, COMM_LEN, 0);
-        if ((len == 0) || (len == -1)) {
-          // Ricevuta stringa vuota: connessione persa
-          throw runtime_error("connessione persa");
-        }
-        comm[len] = '\0';
-        if (!strcmp(comm, "CREATEAC")) {
-          Logger::write_to_log("Creazione nuovo account in corso, in attesa dei dati di accesso");
-          // Ricezione "[username]\r\n[sha-256_password]\r\n"
-          len = recv(s_c, buffer, MAX_BUF_LEN, 0);
-          if ((len == 0) || (len == -1)) {
-            // Ricevuta stringa vuota: connessione persa
-            throw runtime_error("connessione persa");
+      switch (ac.account_manag(flags)) {
+        case TRUE:
+          send_command(s_c, "LOGGEDOK");
+          Logger::write_to_log("Utente " + ac.getUser() + " connesso");
+          return ac;
+        case FALSE:
+          send_command(s_c, "LOGINERR");
+          if (rec == 0) {
+            return login(s_c, usertable, 1);
           }
-          buffer[len] = '\0';
-          // Inserimento in stringhe di username...
-          buf = strtok(buffer, "\r\n");
-          ac.assign_username(buf);
-          // ... e dell'SHA-256 della password
-          buf = strtok(NULL, "\r\n");
-          ac.assign_password(buf);
-          if (ac.account_manag(CREATEACC)) {
-            send_command(s_c, "LOGGEDOK");
-            Logger::write_to_log("Utente " + ac.getUser() + " connesso");
-            return ac;
-          }
-        }
-        return (Account());
+          return (Account());
+        case EXISTING:
+          send_command(s_c, "ALRTHERE");
+          return (Account());
       }
     } else {
       // Comando non riconosciuto

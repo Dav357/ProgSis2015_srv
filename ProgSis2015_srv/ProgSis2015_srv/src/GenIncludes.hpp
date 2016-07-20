@@ -30,7 +30,7 @@
 #define LOGIN 0x01
 #define CREATEACC 0x02
 #define MAX_BUF_LEN 1024
-#define SHORT_BUF_LEN 128
+#define SHORT_BUF_LEN 256
 #define COMM_LEN 8
 
 void send_command(int s_c, const char *command);
