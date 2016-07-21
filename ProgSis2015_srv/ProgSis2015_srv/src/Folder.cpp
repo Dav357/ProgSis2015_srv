@@ -257,7 +257,7 @@ bool Folder::receive_file(int s_c, int vrs, SQLite::Database& db, string folder_
     // Ricezione contenuto del file
     if (file.receive_file_data(s_c, folder_name)) {
       /* Inserimento file nel database */;
-      string _query("INSERT INTO [" + table_name + "] (File_CL, Last_Modif, File_SRV, Hash, Versione_BCK) VALUES (?, ?, ?, ?, ?);");
+      string _query("INSERT INTO '" + table_name + "' (File_CL, Last_Modif, File_SRV, Hash, Versione_BCK) VALUES (?, ?, ?, ?, ?);");
       SQLite::Statement query(db, _query);
       query.bind(1, file.getName());
       query.bind(2, (long long int) file.getTimestamp());
@@ -315,7 +315,7 @@ bool Folder::delete_file_backup(int s_c) {
     throw runtime_error("si sta tentando di operare su una cartella senza averla selezionata");
   }
   int vrs;
-  char buffer[SHORT_BUF_LEN];
+  char buffer[MAX_BUF_LEN];
   try {
     SQLite::Database db("database.db3", SQLITE_OPEN_READWRITE);
     string _query("SELECT MAX(Versione_BCK) FROM '" + table_name + "';");
@@ -337,7 +337,7 @@ bool Folder::delete_file_backup(int s_c) {
     SQL_copy_rows(db, (vrs - 1));
     // - Ricezione nome del file da eliminare
     int len;
-    len = recv(s_c, buffer, SHORT_BUF_LEN, 0);
+    len = recv(s_c, buffer, MAX_BUF_LEN, 0);
     if ((len == 0) || (len == -1)) {
       // Ricevuta stringa vuota: connessione persa
       throw runtime_error("connessione persa");

@@ -37,5 +37,8 @@ public:
 };
 
 Account login(int, char*, int rec = 0);
+/* DEBUG
+ * void test_acc();
+ * */
 
 #endif /* ACCOUNT_H_ */

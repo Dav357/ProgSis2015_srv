@@ -2,6 +2,8 @@
 
 #include "GenIncludes.hpp"
 
+#define MAX_USERNAME_LEN MMAP_LINE_SIZE-1
+
 using namespace std;
 
 enum loginReturnValues {
@@ -11,14 +13,12 @@ enum loginReturnValues {
 };
 
 /* Costruttori */
-
 // Costruttore parziale, per inizializzazione
 Account::Account() {
   usr = "";
   shapass = "";
   complete = false;
 }
-
 // Costruttore completo
 Account::Account(string username, string password) {
   usr = username;
@@ -76,11 +76,11 @@ char Account::account_manag(int flags) {
   string _query;
   SQLite::Database db("database.db3", flags);
   if (flags == LOGIN) {
-    /* Login */
-    _query.assign("SELECT * FROM users WHERE username = ? AND sha2_pass = ?");
+    // Login
+    _query.assign("SELECT * FROM 'users' WHERE 'username' = ? AND 'sha2_pass' = ?");
   } else {
-    /* Creazione account */
-    _query.assign("INSERT INTO users (username, sha2_pass) VALUES (?, ?)");
+    // Creazione account
+    _query.assign("INSERT INTO 'users' ('username', 'sha2_pass') VALUES (?, ?)");
   }
   SQLite::Statement query(db, _query);
   query.bind(1, usr);
@@ -185,6 +185,13 @@ Account login(int s_c, char *usertable, int rec) {
       // ... e dell'SHA-256 della password
       buf = strtok(NULL, "\r\n");
       ac.assign_password(buf);
+      // Controllo lunghezza massima username, in caso negativo...
+      if (ac.getUser().length() > MAX_USERNAME_LEN) {
+        // ...viene comunicata la lunghezza massima per il nome utente
+        sprintf(comm, "MAXC_%03d", MAX_USERNAME_LEN);
+        send_command(s_c, comm);
+        return (Account());
+      }
       if (!strcmp(comm, "LOGIN___")) {
         if (rec == 0)
           flags = LOGIN;
@@ -223,3 +230,13 @@ Account login(int s_c, char *usertable, int rec) {
   }
   return (Account());
 }
+/* DEBUG
+ * void test_acc() {
+ * string a;
+ * char buf[100] = "";
+ * sprintf(buf, "MAXC_%03d", MAX_USERNAME_LEN);
+ * a.assign(buf);
+ * cout << a << endl << a.length() << endl;
+ * cout << MMAP_SIZE << endl;
+}
+*/

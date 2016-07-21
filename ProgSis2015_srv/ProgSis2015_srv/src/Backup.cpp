@@ -53,7 +53,7 @@ void db_maintenance(string table_name) {
       query.bind(1, vrs);
       while (query.executeStep()) {
         string cur_file = query.getColumn("File_SRV");
-        Logger::write_to_log("Aggiunto file " + cur_file + " all'elenco dei file da NON eliminare", DEBUG, LOG_ONLY);
+        Logger::write_to_log("Aggiunto file " + cur_file + " all'elenco dei file da non eliminare", DEBUG, LOG_ONLY);
         non_cancellare.insert(cur_file);
       }
     }
@@ -67,8 +67,8 @@ void db_maintenance(string table_name) {
         // ...che non compaiono nella lista dei file da non eliminare
         string cur_file = query.getColumn("File_SRV");
         if ((non_cancellare.find(cur_file)) == non_cancellare.end()) {
-          Logger::write_to_log("Aggiunto file " + cur_file + " all'elenco dei file da ELIMINARE", DEBUG, LOG_ONLY);
-          cancellare.insert(query.getColumn("File_SRV"));
+          Logger::write_to_log("Aggiunto file " + cur_file + " all'elenco dei file da eliminare", DEBUG, LOG_ONLY);
+          cancellare.insert(cur_file);
         }
       }
     }
@@ -94,7 +94,7 @@ void db_maintenance(string table_name) {
     }
 
     del_empty_fold();
-    Logger::write_to_log("Pulizia del DB terminata");
+    Logger::write_to_log("Pulizia del database terminata");
 
   } catch (SQLite::Exception& e) {
     Logger::write_to_log("Errore DB: " + string(e.what()), ERROR);
@@ -102,7 +102,7 @@ void db_maintenance(string table_name) {
 }
 
 void del_empty_fold() {
-  // Si eliminano le cartelle vuote rimaste
-  system("find ./ReceivedFiles/ -empty -type d -delete");
+  // Si eliminano le cartelle vuote rimaste, eventuali errori sono soppressi (es. la cartella ReceivedFiles è vuota)
+  system("find ./ReceivedFiles/* -empty -type d -delete 2> /dev/null");
   Logger::write_to_log("Eliminate cartelle vuote", DEBUG, LOG_ONLY);
 }

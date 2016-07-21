@@ -63,7 +63,8 @@ void Logger::write_to_log(std::string msg, int type, int scope) {
       if (scope == LOG_ONLY) break;
       //no break
     case CONSOLE_ONLY:
-      (type == DEBUG) ? ((*target) << ("- ")) : ((*target) << ("❌ ")) << msg << endl;
+      (type == DEBUG) ? ((*target) << ("- ")) : ((*target) << ("❌ "));
+      (*target) << msg << endl;
   }
 }
 

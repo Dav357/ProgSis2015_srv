@@ -27,11 +27,19 @@
 #include "Backup.h"
 #include "SQLiteCpp/SQLiteCpp.h"
 
+// Flag per l'operazione di login
 #define LOGIN 0x01
 #define CREATEACC 0x02
+// Dimensione buffer usati sia per la comunicazione con il client, sia internamente
 #define MAX_BUF_LEN 1024
-#define SHORT_BUF_LEN 256
+// Lunghezza comandi e risposte
 #define COMM_LEN 8
+// Dimensione area di memoria condivisa, dipende da lunghezza della linea e dal numero massimo di slot per gli utenti
+#define MMAP_SIZE MMAP_LINE_SIZE*MMAP_MAX_USER
+// Lunghezza massima linea dell'area condivisa, da cui dipende la lunghezza massima del nome utente
+#define MMAP_LINE_SIZE 64
+// Numero massimo di slot per gli utenti
+#define MMAP_MAX_USER 128
 
 void send_command(int s_c, const char *command);
 bool add_to_usertable(std::string);

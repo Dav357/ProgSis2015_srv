@@ -8,6 +8,7 @@
 #include "GenIncludes.hpp"
 
 #include <map>
+#include <set>
 #include <semaphore.h>
 #include <csignal>
 #include <sys/wait.h>
@@ -15,10 +16,7 @@
 #include <arpa/inet.h>
 
 #define BKLOG 10
-#define FILE_NAME_LEN 30
-#define MMAP_SIZE 4096
-#define MMAP_LINE_SIZE 32
-#define MMAP_MAX_USER 128
+
 
 using namespace std;
 
@@ -98,13 +96,20 @@ int main(int argc, char** argv) {
   socklen_t claddr_len = sizeof(struct sockaddr_in);
   int s, s_c; //Socket
 
+  /* DEBUG
+   * test_acc();
+   * return 0;
+  */
+
   Logger log("[" + to_string(getpid()) + "] debug.log");
   // Inizializzazione tabella comandi
   Initialize();
 
+
+
   if (argc != 2) {
     Logger::write_to_log("Errore nei parametri, formato corretto: <nome eseguibile> <porta> o <nome eseguibile> -m", ERROR);
-    return (-1);
+    exit(EXIT_FAILURE);
   }
 
   if (!strcmp(argv[1], "-m"))
@@ -114,7 +119,7 @@ int main(int argc, char** argv) {
   // Creazione socket
   if ((s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
     Logger::write_to_log("Errore nella creazione del socket, chiusura programma", ERROR);
-    return -1;
+    exit(EXIT_FAILURE);
   }
   Logger::write_to_log("Socket creato correttamente", DEBUG, LOG_ONLY);
 
@@ -125,31 +130,31 @@ int main(int argc, char** argv) {
   if (setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen) < 0) {
     Logger::write_to_log("Errore nell'impostazione delle opzioni del socket, chiusura programma", ERROR);
     close(s);
-    return (-1);
+    exit(EXIT_FAILURE);
   }
   Logger::write_to_log("Impostazione SO_KEEPALIVE del socket applicata correttamente", DEBUG, LOG_ONLY);
   // Bind del socket e listen
   if (bind(s, (struct sockaddr*) &saddr, sizeof(saddr)) == -1) {
     Logger::write_to_log("Errore nel binding del socket, chiusura programma", ERROR);
     close(s);
-    return (-1);
+    exit(EXIT_FAILURE);
   }
   Logger::write_to_log("Bind del socket effettuato correttamente", DEBUG, LOG_ONLY);
   if (listen(s, BKLOG) == -1) {
     Logger::write_to_log("Errore nell'operazione di ascolto sul socket, chiusura programma", ERROR);
     close(s);
-    return (-1);
+    exit(EXIT_FAILURE);
   }
   Logger::write_to_log("Socket posto correttamente in ascolto", DEBUG, LOG_ONLY);
   // Area mappata:
-  //   4096 Byte -> 32 (Lunghezza massima nome utente) x 128 (Possibili utenti connessi contemporaneamente OvK)
+  //   MMAP_SIZE -> MMAP_LINE_SIZE (Lunghezza massima nome utente, in byte) x MMAP_MAX_USER (Possibili utenti connessi contemporaneamente OvK)
   // + byte necessari per allocare il semaforo (sizeof(sem_t))
   if ((sem_usertable = (sem_t*) mmap(NULL, sizeof(sem_t) + MMAP_SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0)) == MAP_FAILED) {
     Logger::write_to_log("Errore nella creazione dell'area di memoria condivisa, chiusura programma", ERROR);
-    return (-1);
+    exit(EXIT_FAILURE);
   }
   usertable = (char*) sem_usertable + sizeof(sem_t);
-  Logger::write_to_log("Area di memoria condivisa (tabella utenti e semaforo) creata correttamente", DEBUG, LOG_ONLY);
+  Logger::write_to_log("Area di memoria condivisa (tabella utenti e semaforo) creata correttamente, dimensione totale: " +  to_string(sizeof(sem_t) + MMAP_SIZE), DEBUG, LOG_ONLY);
   // Inizializzazione semaforo, non locale al processo, 1 accesso per volta
   if ((sem_init(sem_usertable, 1, 1)) == -1) {
     Logger::write_to_log("Errore nell'inizializzazione del semaforo", ERROR);
@@ -172,7 +177,7 @@ int main(int argc, char** argv) {
     pid = fork();
     if (pid == -1) {
       Logger::write_to_log("Errore nella funzione fork()", ERROR);
-      return (-1);
+      exit(EXIT_FAILURE);
     } else if (pid == 0) {
       // Processo figlio
       Logger::reopen_log("[" + to_string(getpid()) + "] debug.log");
@@ -180,7 +185,7 @@ int main(int argc, char** argv) {
       close(s);
       server_function(s_c, getpid());
       close(s_c);
-      return (0);
+      exit(EXIT_SUCCESS);
     } else {
       // Processo padre
       Logger::write_to_log("Il processo [" + to_string(pid) + "] è connesso all'host: " + string(inet_ntoa(claddr.sin_addr)));
@@ -188,14 +193,13 @@ int main(int argc, char** argv) {
     }
   }
   close(s);
-  return (0);
+  exit(EXIT_SUCCESS);
 }
 
 // Funzione di gestione operazioni del server
 void server_function(int s_c, int pid) {
 
-  vector<string> used_tables;
-  //Logger log("[" + to_string(pid) + "] debug.log");
+  set<string> used_tables;
   Account ac;
   Folder f;
   int len;
@@ -224,7 +228,7 @@ void server_function(int s_c, int pid) {
           send_command(s_c, "CMND_REC");
           f = ac.select_folder(s_c);
           if (!f.getPath().empty()) {
-            used_tables.push_back(f.getTableName());
+            used_tables.insert(f.getTableName());
             Logger::write_to_log("Cartella selezionata: " + f.getPath());
           } else {
             Logger::write_to_log("Errore nella selezione della cartella", ERROR);
@@ -281,7 +285,6 @@ void server_function(int s_c, int pid) {
         case Logout:
           comm[0] = '\0';
           Logger::write_to_log("Ricevuto comando 'logout'");
-          //cout << "- Ricevuto comando 'logout'" << endl;
           send_command(s_c, "CMND_REC");
           ac.clear();
           Logger::write_to_log("Disconnessione effettuata");
@@ -299,7 +302,6 @@ void server_function(int s_c, int pid) {
     Logger::write_to_log("Pulizia database e cartella file ricevuti in corso");
     db_maintenance(table);
   }
-  return;
 }
 
 // Invio di un comando all'host
@@ -313,10 +315,10 @@ bool add_to_usertable(string user) {
 
   // Aggiungere un utente connesso all'elenco degli utenti:
   string line;
-  // Si scorre l'area di memoria a 32 caratteri per volta
+  // Si scorre l'area di memoria una linea per volta (numero di bytes pari a MMAP_LINE_SIZE)
   sem_wait(sem_usertable);
   for (int i = 0; i < MMAP_SIZE; i += MMAP_LINE_SIZE) {
-    // Lettura fino al '\0', al massimo 31 caratteri (lunghezza username limitata a 31 caratteri)
+    // Lettura fino al '\0', al massimo MMAP_LINE_SIZE-1 bytes (lunghezza username limitata a MMAP_LINE_SIZE-1 bytes)
     line.assign((usertable + i));
     if (line.empty()) {
       // Se la riga è vuota -> si inserisce il nome dell'utente corrente
@@ -383,27 +385,31 @@ void server_management() {
 
   char comm = 'c', comm_reset = 'n';
   char exit_flag = 0;
-  cout << "Comandi disponibili:" << endl << "- Elenco [U]tenti" << endl << "- Elenco [T]abelle nel Database" << endl << "- [E]limina utente" << endl << "- [A]zzera contenuto server" << endl
+  cout << "Comandi disponibili:" << endl << "- Elenco [U]tenti" << endl << "- Elenco [T]abelle nel database" << endl << "- [E]limina utente" << endl << "- [A]zzera contenuto server" << endl
       << "- Us[C]ita" << endl;
   for (; exit_flag == 0;) {
     cout << "Comando: ";
     cin >> comm;
     switch (comm) {
+      // Elenco utenti
       case 'u':
       case 'U':
         user_list();
         break;
+      // Elenco tabelle, non di servizio, nel DB
       case 't':
       case 'T':
         table_listing();
         break;
+      // Rimozione di un utente e relativi dati
       case 'e':
       case 'E':
         user_removal();
         break;
+      // Eliminazione di tutti i dati dal server
       case 'a':
       case 'A':
-        // Richiesta conferma
+        // Azione drastica, richiesta conferma
         cout << "VUOI DAVVERO ELIMINARE COMPLETAMENTE I DATI CONTENUTI NEL SERVER? S/[N]: ";
         cin >> comm_reset;
         switch (comm_reset) {
@@ -415,11 +421,13 @@ void server_management() {
             cout << "Annullamento" << endl;
         }
         break;
+      // Uscita dalla manutenzione del server
       case 'c':
       case 'C':
         exit_flag = 1;
         cout << "Uscita" << endl;
         break;
+      // Ricezione di un comando sconosciuto
       default:
         cout << "Comando sconosciuto: " << comm << endl;
         break;
@@ -427,7 +435,6 @@ void server_management() {
   }
   exit(EXIT_SUCCESS);
 }
-
 // Elenco utenti
 void user_list() {
 
@@ -436,17 +443,18 @@ void user_list() {
     string _query = "SELECT username FROM users ORDER BY user_id;";
     SQLite::Statement query(db, _query);
     bool r = query.executeStep();
-    if (r)
+    if (r) {
       cout << "■ Elenco utenti, per ordine di iscrizione: " << endl;
-    else
+    } else {
       cout << "■ Nessun utente presente " << endl;
-    for (; r != false; r = query.executeStep())
+    }
+    for (; r != false; r = query.executeStep()) {
       cout << query.getColumn(0) << endl;
+    }
   } catch (SQLite::Exception& e) {
     cerr << "❌ Errore nell'accesso al DB: " << e.what() << endl << "❌ Operazione non eseguita." << endl;
   }
 }
-
 // Elenco tabelle relative al server
 void table_listing() {
 
@@ -455,16 +463,15 @@ void table_listing() {
     string _query = "SELECT name FROM sqlite_master WHERE type='table' AND name <> 'sqlite_sequence' ORDER BY name;";
     SQLite::Statement query(db, _query);
     cout << "■ Elenco tabelle presenti nel database: " << endl;
-    for (bool r = query.executeStep(); r != false; r = query.executeStep())
+    for (bool r = query.executeStep(); r != false; r = query.executeStep()) {
       cout << query.getColumn(0) << endl;
+    }
   } catch (SQLite::Exception& e) {
     cerr << "❌ Errore nel Database: " << e.what() << endl << "❌ Operazione non eseguita." << endl;
   }
 }
-
 // Rimozione utente e relative cartelle
 void user_removal() {
-  //TODO Finire implementazione funzione
   // Eliminazione utente e relativi contenuti:
   // - Si richiede l'utente da eliminare
   // - Si elimina l'entry dell'utente da 'users'
@@ -493,19 +500,33 @@ void user_removal() {
     // Ricerca tabelle relative all'utente da eliminare
     string _query = "SELECT name FROM sqlite_master WHERE type='table' AND name <> 'sqlite_sequence' ORDER BY name;";
     SQLite::Statement query(db, _query);
-    for (bool r = query.executeStep(); r != false; r = query.executeStep())
+    // Costruzione lista completa tabelle, eccetto 'sqlite_sequence' in quanto tabella tabella di servizio del DB
+    for (bool r = query.executeStep(); r != false; r = query.executeStep()) {
       tables_list.push_back(query.getColumn(0));
-    for (string t : tables_list)
-      if (t.find(string("_" + user_to_delete + "_")) != string::npos) tables_to_delete.push_back(t);
-    for (string t_e : tables_to_delete)
+    }
+    // Costruzione lista tabelle relative all'utente considerato, identificate dalla presenza di _[nome_utente]_
+    for (string t : tables_list) {
+      if (t.find(string("_" + user_to_delete + "_")) != string::npos) {
+        tables_to_delete.push_back(t);
+      }
+    }
+    // Ciclo con doppia funzione:
+    for (string t_e : tables_to_delete) {
+      // eliminazione dei file dell'utente...
+      SQLite::Statement query(db, "SELECT DISTINCT File_SRV FROM '" + t_e + "';");
+      while (query.executeStep()) {
+        remove(query.getColumn("File_SRV"));
+      }
+      // ...ed eliminazione tabella (DROP)
       SQLite::Statement(db, "DROP TABLE '" + t_e + "';").exec();
-    cout << "Rimossi riferimenti alle cartelle dell'utente " + user_to_delete + " dal database" << endl;
-    //TODO Eliminazione cartelle relative all'utente da eliminare
+    }
+    // Eliminazione cartelle vuote rimaste
+    system("find ./ReceivedFiles/* -empty -type d -delete 2> /dev/null");
+    cout << "Rimossi tutti i contenuti dell'utente " + user_to_delete + " dal database" << endl;
   } catch (SQLite::Exception& e) {
     cerr << "❌ Errore nell'accesso al DB: " << e.what() << endl << "❌ Operazione non eseguita." << endl;
   }
 }
-
 // Eliminazione contenuto del server
 void server_wipe() {
   // Azzeramento contenuto del server:
