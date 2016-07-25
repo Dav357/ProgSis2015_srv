@@ -53,9 +53,9 @@ public:
     return hash;
   }
   void completed();
-  bool receive_file_data(int socket, std::string);
-  void send_file_data(int socket);
-  bool hash_check(int fpointer);
+  bool receiveFileData(int socket, std::string);
+  void sendFileData(int socket);
+  bool hashCheck(int fpointer);
 };
 
 #endif /* FILE_H_ */

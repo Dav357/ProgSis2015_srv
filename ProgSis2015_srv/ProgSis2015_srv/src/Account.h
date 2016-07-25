@@ -21,24 +21,23 @@ public:
   Account();
   Account(std::string, std::string);
   void assign(std::string, std::string);
-  void assign_username(std::string);
-  void assign_username(char*);
-  void assign_password(std::string);
-  void assign_password(char*);
+  void assignUsername(std::string);
+  void assignUsername(char*);
+  void assignPassword(std::string);
+  void assignPassword(char*);
   std::string getUser() {
     return usr;
   }
-  bool is_complete() {
+  bool isComplete() {
     return complete;
   }
-  char account_manag(int flag);
-  Folder select_folder(int);
+  char accountManag(int flag);
+  Folder selectFolder(int);
   void clear();
 };
 
 Account login(int, char*, int rec = 0);
-/* DEBUG
- * void test_acc();
- * */
+
+void test_func();
 
 #endif /* ACCOUNT_H_ */

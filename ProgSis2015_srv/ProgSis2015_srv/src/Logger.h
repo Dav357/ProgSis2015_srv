@@ -12,19 +12,19 @@
 #include <fstream>
 #include <string>
 
-#define DEBUG 0x0001
-#define ERROR 0x0002
-#define LOG_ONLY 0x1000
-#define CONSOLE_ONLY 0x2000
-#define LOG_AND_CONSOLE 0x3000
+const int DEBUG = 0x0001;
+const int ERROR = 0x0002;
+const int LOG_ONLY = 0x1000;
+const int CONSOLE_ONLY = 0x2000;
+const int LOG_AND_CONSOLE = 0x3000;
 
 // Classe logger, per una gestione più semplice delle comunicazioni dal processo
 class Logger {
 public:
   Logger(std::string);
-  static void reopen_log(std::string);
-  static void write_to_log(std::string msg, int type = DEBUG, int scope = LOG_AND_CONSOLE);
-  virtual ~Logger();
+  static void reopenLog(std::string);
+  static void writeToLog(std::string msg, int type = DEBUG, int scope = LOG_AND_CONSOLE);
+  ~Logger();
 
 private:
 

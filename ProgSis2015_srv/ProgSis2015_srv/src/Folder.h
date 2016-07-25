@@ -34,21 +34,21 @@ public:
   std::string getUser() {
     return user.getUser();
   }
-  void insert_file(File);
-  void clear_folder();
-  std::vector<File> get_files() {
+  void insertFile(File);
+  void clearFolder();
+  std::vector<File> getFiles() {
     return files;
   }
-  bool create_table_folder();
-  void get_folder_stat(int);
-  void remove_files();
-  bool full_backup(int);
-  void send_backup(int);
-  void send_single_file(int);
-  bool new_file_backup(int);
-  bool delete_file_backup(int);
-  bool receive_file(int socket, int versione, SQLite::Database&, std::string);
-  void SQL_copy_rows(SQLite::Database&, int);
+  bool createTableFolder();
+  void getFolderStat(int);
+  void removeFiles();
+  bool fullBackup(int);
+  void sendBackup(int);
+  void sendSingleFile(int);
+  bool newFileBackup(int);
+  bool deleteFileBackup(int);
+  bool receiveFile(int socket, int versione, SQLite::Database&, std::string);
+  void SQLCopyRows(SQLite::Database&, int);
 };
 
 #endif /* FOLDER_H_ */

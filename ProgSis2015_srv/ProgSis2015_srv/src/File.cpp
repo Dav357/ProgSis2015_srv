@@ -7,7 +7,6 @@
 
 #include "GenIncludes.hpp"
 #include "File.h"
-#include <fcntl.h>
 #include <sys/stat.h>
 #include <openssl/md5.h>
 using namespace std;
@@ -61,7 +60,7 @@ File::~File() {
 }
 
 // Ricezione dei byte che compongono il file
-bool File::receive_file_data(int s_c, string folder_name) {
+bool File::receiveFileData(int s_c, string folder_name) {
 
   int fpoint;
   time_t t = time(NULL);
@@ -71,7 +70,7 @@ bool File::receive_file_data(int s_c, string folder_name) {
   string path_to_file;
   if (folder_name.empty()) {
     // Se il nome è vuoto, ricezione di un solo file nuovo/aggiornato -> cartella nuova
-    path_to_file.assign("./ReceivedFiles/" + base_path.getUser() + "_" + base_path.getPath() + "_" + to_string(t));
+    path_to_file.assign("./" + ServerSettings::getFilesFolder() + "/" + base_path.getUser() + "_" + base_path.getPath() + "_" + to_string(t));
   } else {
     // Se è presente un percorso -> backup completo, tutti i file in una sola cartella
     path_to_file.assign(folder_name);
@@ -86,10 +85,10 @@ bool File::receive_file_data(int s_c, string folder_name) {
 
   //Apertura file: in sola scrittura, crea se non esistente; permessi: -rwxrw-r-- (764)
   if ((fpoint = open(fullpath.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRWXU | S_IRGRP | S_IWGRP | S_IROTH)) < 0) {
-    Logger::write_to_log("Errore nella creazione del file", ERROR);
+    Logger::writeToLog("Errore nella creazione del file", ERROR);
     return false;
   } else {
-    Logger::write_to_log("File " + fullpath + " creato correttamente, ricezione file in corso");
+    Logger::writeToLog("File " + fullpath + " creato correttamente, ricezione file in corso");
     //Loop di lettura bytes inviati dal client
     int rbyte = 0;
     size_t received = 0;
@@ -101,12 +100,12 @@ bool File::receive_file_data(int s_c, string folder_name) {
       write(fpoint, buffer, rbyte);
       received += rbyte;
       if (received == size) {
-        if (this->hash_check(fpoint)) {
+        if (this->hashCheck(fpoint)) {
           close(fpoint);
-          Logger::write_to_log("L'hash del file ricevuto corrisponde all'hash fornito dal client");
+          Logger::writeToLog("L'hash del file ricevuto corrisponde all'hash fornito dal client");
           return true;
         } else {
-          Logger::write_to_log("L'hash del file ricevuto non corrisponde all'hash fornito dal client", ERROR);
+          Logger::writeToLog("L'hash del file ricevuto non corrisponde all'hash fornito dal client", ERROR);
           close(fpoint);
           throw ios_base::failure("hash non corrispondente, cancellazione");
         }
@@ -118,7 +117,7 @@ bool File::receive_file_data(int s_c, string folder_name) {
 }
 
 // Controllo integrità del file (MD5)
-bool File::hash_check(int fpoint) {
+bool File::hashCheck(int fpoint) {
   // Calcolo MD5 file
   // Lettura MD5 dalle informazioni ricevute relative al file
   // Valore di ritorno: confronto dei 2 MD5
@@ -140,14 +139,14 @@ bool File::hash_check(int fpoint) {
     sprintf(hash_str + (2 * i), "%02X", hash[i]);
   }
   string local_md5(hash_str);
-  Logger::write_to_log("File " + filename + ": MD5 ricevuto: " + remote_md5 + ", MD5 calcolato: " + local_md5);
+  Logger::writeToLog("File " + filename + ": MD5 ricevuto: " + remote_md5 + ", MD5 calcolato: " + local_md5);
   return ((local_md5.compare(remote_md5) == 0) ? true : false);
 }
 
 // Invio dei byte che compongono il file
-void File::send_file_data(int s_c) {
+void File::sendFileData(int s_c) {
 
-  char comm[COMM_LEN], buffer[MAX_BUF_LEN + 1];
+  char comm[COMM_LEN+1] = "", buffer[MAX_BUF_LEN + 1] = "";
   int fpoint = open(save_path.c_str(), O_RDONLY);
   send(s_c, hash.c_str(), hash.length(), 0);
   int len = recv(s_c, comm, COMM_LEN, 0);
@@ -157,7 +156,7 @@ void File::send_file_data(int s_c) {
   }
   comm[len] = '\0';
   if (!strcmp(comm, "DATA_REC")) {
-    Logger::write_to_log("Hash del file ricevuto dal client", DEBUG, CONSOLE_ONLY);
+    Logger::writeToLog("Hash del file ricevuto dal client", DEBUG, CONSOLE_ONLY);
   } else {
     throw runtime_error("ricevuto comando sconosciuto");
   }

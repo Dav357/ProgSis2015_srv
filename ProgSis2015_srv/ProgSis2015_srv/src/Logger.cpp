@@ -7,6 +7,7 @@
 
 #include "Logger.h"
 #include <sys/time.h>
+#include <locale.h>
 #define BUF_LEN 120
 using namespace std;
 
@@ -17,21 +18,24 @@ struct timeval Logger::start_program_time;
 Logger::Logger(string gen_log) {
 
   char buffer[BUF_LEN];
+  // Impostazione del formato date ad italiano
+  setlocale(LC_ALL, "it_IT");
   // UNIX timestamp in secondi e microsecondi
   gettimeofday(&start_program_time, NULL);
-  Logger::general_log.open("./Log/" + gen_log, ofstream::out);
+  general_log.open("./Log/" + gen_log, ofstream::out);
 
   //Stuct time_info presa dai secondi della struct timeval
   struct tm *time_info = gmtime(&(start_program_time.tv_sec));
   time_info->tm_hour += 2;
   strftime(buffer, BUF_LEN, "%A %e/%m/%Y, %H:%M:%S.", time_info);
+  buffer[0] = toupper(buffer[0]);
 
   general_log << "Avvio processo: " << buffer << (start_program_time.tv_usec / 1000) << endl;
 
 }
 
 // Scrive il messaggio ricevuto nei modi specificati, default: messaggio di debug da emettere sia in console che nel log degli eventi
-void Logger::write_to_log(std::string msg, int type, int scope) {
+void Logger::writeToLog(std::string msg, int type, int scope) {
 
   string pref;
   ostream *target;
@@ -43,11 +47,11 @@ void Logger::write_to_log(std::string msg, int type, int scope) {
     case DEBUG:
       pref.assign(" - DEBUG - ");
       target = &cout;
-    break;
+      break;
     case ERROR:
       pref.assign(" X ERROR X ");
       target = &cerr;
-    break;
+      break;
   }
 
   struct tm *time_info = gmtime(&(now.tv_sec));
@@ -68,6 +72,24 @@ void Logger::write_to_log(std::string msg, int type, int scope) {
   }
 }
 
+// Funzione di riapertura del log, per i processi figli (altrimenti continuerebbero a scrivere sul file aperto dal padre
+void Logger::reopenLog(string chl_log) {
+
+  char buffer[BUF_LEN];
+  // UNIX timestamp in secondi e microsecondi
+  gettimeofday(&start_program_time, NULL);
+  general_log.close();
+  general_log.open("./Log/" + chl_log, ofstream::out);
+
+  //Stuct time_info presa dai secondi della struct timeval
+  struct tm *time_info = gmtime(&(start_program_time.tv_sec));
+  time_info->tm_hour += 2;
+  strftime(buffer, BUF_LEN, "%A %e/%m/%Y, %H:%M:%S.", time_info);
+
+  general_log << "Avvio processo: " << buffer << (start_program_time.tv_usec / 1000) << endl;
+
+}
+
 // Distruttore: chiude il log con data e ora di terminazione del processo
 Logger::~Logger() {
 
@@ -76,24 +98,7 @@ Logger::~Logger() {
   struct tm *time_info = gmtime(&(start_program_time.tv_sec));
   time_info->tm_hour += 2;
   strftime(buffer, BUF_LEN, "%A %e/%m/%Y, %H:%M:%S.", time_info);
+  buffer[0] = toupper(buffer[0]);
   general_log << "Chiusura processo: " << buffer << (start_program_time.tv_usec / 1000) << endl;
-
-}
-
-// Funzione di riapertura del log, per i processi figli (altrimenti continuerebbero a scrivere sul file aperto dal padre
-void Logger::reopen_log(string chl_log) {
-
-  char buffer[BUF_LEN];
-  // UNIX timestamp in secondi e microsecondi
-  gettimeofday(&start_program_time, NULL);
-  Logger::general_log.close();
-  Logger::general_log.open("./Log/" + chl_log, ofstream::out);
-
-  //Stuct time_info presa dai secondi della struct timeval
-  struct tm *time_info = gmtime(&(start_program_time.tv_sec));
-  time_info->tm_hour += 2;
-  strftime(buffer, BUF_LEN, "%A %e/%m/%Y, %H:%M:%S.", time_info);
-
-  general_log << "Avvio processo: " << buffer << (start_program_time.tv_usec / 1000) << endl;
 
 }

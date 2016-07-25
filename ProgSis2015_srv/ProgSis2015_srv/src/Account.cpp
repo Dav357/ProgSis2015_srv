@@ -1,15 +1,10 @@
-#include "Account.h"
-
 #include "GenIncludes.hpp"
-
-#define MAX_USERNAME_LEN MMAP_LINE_SIZE-1
+#include "Account.h"
 
 using namespace std;
 
 enum loginReturnValues {
-  TRUE,
-  FALSE,
-  EXISTING
+  TRUE, FALSE, EXISTING
 };
 
 /* Costruttori */
@@ -28,7 +23,7 @@ Account::Account(string username, string password) {
 /* Fine costruttori */
 
 // Assegnazione nome utente all'account corrente (da stringa)
-void Account::assign_username(std::string username) {
+void Account::assignUsername(std::string username) {
   usr = username;
   if (!shapass.empty()) {
     complete = true;
@@ -36,7 +31,7 @@ void Account::assign_username(std::string username) {
 }
 
 // Assegnazione nome utente all'account corrente (da puntatore a char)
-void Account::assign_username(char* username) {
+void Account::assignUsername(char* username) {
   usr.assign(username);
   if (!shapass.empty()) {
     complete = true;
@@ -44,7 +39,7 @@ void Account::assign_username(char* username) {
 }
 
 // Assegnazione password all'account corrente (da stringa)
-void Account::assign_password(std::string password) {
+void Account::assignPassword(std::string password) {
   shapass = password;
   if (!usr.empty()) {
     complete = true;
@@ -52,7 +47,7 @@ void Account::assign_password(std::string password) {
 }
 
 // Assegnazione password all'account corrente (da puntatore a char)
-void Account::assign_password(char* password) {
+void Account::assignPassword(char* password) {
   shapass.assign(password);
   if (!usr.empty()) {
     complete = true;
@@ -61,7 +56,7 @@ void Account::assign_password(char* password) {
 
 // Rimozione dei dati relativi all'account
 void Account::clear() {
-  if (!usr.empty()) remove_from_usertable(usr);
+  if (!usr.empty()) removeFromUsertable(usr);
   usr.clear();
   shapass.clear();
   complete = false;
@@ -69,12 +64,12 @@ void Account::clear() {
 }
 
 // Gestione account: login/creazione
-char Account::account_manag(int flags) {
+char Account::accountManag(int flags) {
   // flags vale:
   // - 0x01 per login (equivale a DB in sola lettura)
   // - 0x02 per creazione account (DB in lettura/scrittura)
   string _query;
-  SQLite::Database db("database.db3", flags);
+  SQLite::Database db(ServerSettings::getDBFile(), flags);
   if (flags == LOGIN) {
     // Login
     _query.assign("SELECT * FROM 'users' WHERE 'username' = ? AND 'sha2_pass' = ?");
@@ -87,25 +82,25 @@ char Account::account_manag(int flags) {
   query.bind(2, shapass);
   if (flags == LOGIN) {
     if (query.executeStep()) {
-      Logger::write_to_log("Account " + usr + " trovato");
-      if (!add_to_usertable(usr))
+      Logger::writeToLog("Account " + usr + " trovato");
+      if (!addToUsertable(usr))
         return EXISTING;
       else
         return TRUE;
     } else {
-      Logger::write_to_log("Combinazione username/password per " + usr + " non trovata");
+      Logger::writeToLog("Combinazione username/password per " + usr + " non trovata");
       clear();
       return FALSE;
     }
   } else {
     if (query.exec() == 1) {
-      Logger::write_to_log("Account " + usr + " creato con successo, utente connesso");
-      if (!add_to_usertable(usr))
+      Logger::writeToLog("Account " + usr + " creato con successo, utente connesso");
+      if (!addToUsertable(usr))
         return EXISTING;
       else
         return TRUE;
     } else {
-      Logger::write_to_log("Errore nella creazione dell'account", ERROR);
+      Logger::writeToLog("Errore nella creazione dell'account", ERROR);
       clear();
       return FALSE;
     }
@@ -113,7 +108,7 @@ char Account::account_manag(int flags) {
 }
 
 // Selezione di una cartella relativa all'account
-Folder Account::select_folder(int s_c) {
+Folder Account::selectFolder(int s_c) {
 
   int len;
   char buffer[MAX_BUF_LEN + 1] = "";
@@ -130,25 +125,25 @@ Folder Account::select_folder(int s_c) {
   Folder f(path, (*this));
   try {
     // Apertura DB (sola lettura)
-    SQLite::Database db("database.db3", SQLITE_OPEN_READONLY);
+    SQLite::Database db(ServerSettings::getDBFile(), SQLITE_OPEN_READONLY);
 
     if (db.tableExists(f.getTableName())) {
-      Logger::write_to_log("Trovata tabella relativa alla cartella");
-      send_command(s_c, "FOLDEROK");
+      Logger::writeToLog("Trovata tabella relativa alla cartella");
+      sendCommand(s_c, "FOLDEROK");
       return f;
     } else {
-      Logger::write_to_log("Tabella relativa alla cartella " + path + " non trovata, creazione tabella");
-      if (f.create_table_folder()) {
-        send_command(s_c, "FOLDEROK");
+      Logger::writeToLog("Tabella relativa alla cartella " + path + " non trovata, creazione tabella");
+      if (f.createTableFolder()) {
+        sendCommand(s_c, "FOLDEROK");
         return f;
       } else {
-        send_command(s_c, "FOLD_ERR");
+        sendCommand(s_c, "FOLD_ERR");
         return (Folder());
       }
     }
   } catch (SQLite::Exception& e) {
-    Logger::write_to_log("Errore DB: " + string(e.what()), ERROR);
-    send_command(s_c, "DB_ERROR");
+    Logger::writeToLog("Errore DB: " + string(e.what()), ERROR);
+    sendCommand(s_c, "DB_ERROR");
     return (Folder());
   }
   return (Folder());
@@ -171,7 +166,7 @@ Account login(int s_c, char *usertable, int rec) {
   try {
     // Richiesta di login o richiesta di creazione account
     if (!strcmp(comm, "LOGIN___") || (!strcmp(comm, "CREATEAC"))) {
-      Logger::write_to_log("Autenticazione in corso, in attesa dei dati di accesso");
+      Logger::writeToLog("Autenticazione in corso, in attesa dei dati di accesso");
       // Ricezione "[username]\r\n[sha-256_password]\r\n"
       len = recv(s_c, buffer, MAX_BUF_LEN, 0);
       if ((len == 0) || (len == -1)) {
@@ -181,62 +176,61 @@ Account login(int s_c, char *usertable, int rec) {
       buffer[len] = '\0';
       // Inserimento in stringhe di username...
       buf = strtok(buffer, "\r\n");
-      ac.assign_username(buf);
+      ac.assignUsername(buf);
       // ... e dell'SHA-256 della password
       buf = strtok(NULL, "\r\n");
-      ac.assign_password(buf);
+      ac.assignPassword(buf);
       // Controllo lunghezza massima username, in caso negativo...
-      if (ac.getUser().length() > MAX_USERNAME_LEN) {
+      if (ac.getUser().length() > ServerSettings::getMaxUsernameLen()) {
         // ...viene comunicata la lunghezza massima per il nome utente
-        sprintf(comm, "MAXC_%03d", MAX_USERNAME_LEN);
-        send_command(s_c, comm);
+        sprintf(comm, "MAXC_%03lu", ServerSettings::getMaxUsernameLen());
+        sendCommand(s_c, comm);
         return (Account());
       }
       if (!strcmp(comm, "LOGIN___")) {
         if (rec == 0)
           flags = LOGIN;
         else {
-          send_command(s_c, "LOGINERR");
+          sendCommand(s_c, "LOGINERR");
           return (Account());
         }
       } else {
         flags = CREATEACC;
       }
-      switch (ac.account_manag(flags)) {
+      switch (ac.accountManag(flags)) {
         case TRUE:
-          send_command(s_c, "LOGGEDOK");
-          Logger::write_to_log("Utente " + ac.getUser() + " connesso");
+          sendCommand(s_c, "LOGGEDOK");
+          Logger::writeToLog("Utente " + ac.getUser() + " connesso");
           return ac;
         case FALSE:
-          send_command(s_c, "LOGINERR");
+          sendCommand(s_c, "LOGINERR");
           if (rec == 0) {
             return login(s_c, usertable, 1);
           }
           return (Account());
         case EXISTING:
-          send_command(s_c, "ALRTHERE");
+          sendCommand(s_c, "ALRTHERE");
           return (Account());
       }
     } else {
       // Comando non riconosciuto
-      send_command(s_c, "UNKNOWN_");
+      sendCommand(s_c, "UNKNOWN_");
       return ac;
     }
   } catch (SQLite::Exception& e) {
-    Logger::write_to_log("Errore DB: " + string(e.what()), ERROR);
-    send_command(s_c, "DB_ERROR");
+    Logger::writeToLog("Errore DB: " + string(e.what()), ERROR);
+    sendCommand(s_c, "DB_ERROR");
     ac.clear();
     return ac;
   }
   return (Account());
 }
-/* DEBUG
- * void test_acc() {
- * string a;
- * char buf[100] = "";
- * sprintf(buf, "MAXC_%03d", MAX_USERNAME_LEN);
- * a.assign(buf);
- * cout << a << endl << a.length() << endl;
- * cout << MMAP_SIZE << endl;
+
+void test_func() {
+  string a;
+  char buf[100] = "";
+  sprintf(buf, "MAXC_%03lu", ServerSettings::getMaxUsernameLen());
+  a.assign(buf);
+  cout << a << endl << a.length() << endl;
+  cout << ServerSettings::getMMapSize() << endl;
 }
-*/

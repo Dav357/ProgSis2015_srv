@@ -19,37 +19,37 @@ Folder::Folder(string p, Account& user) :
 }
 
 // Azzera le informazioni relative alla cartella
-void Folder::clear_folder() {
+void Folder::clearFolder() {
   path = "";
   table_name = "";
   files.clear();
 }
 
 // Inserisci il file specificato nella cartella
-void Folder::insert_file(File f) {
+void Folder::insertFile(File f) {
   files.push_back(f);
 }
 
 // Crea nuova tabella nel DB relativa alla cartella
-bool Folder::create_table_folder() {
+bool Folder::createTableFolder() {
 
-  SQLite::Database db("database.db3", SQLITE_OPEN_READWRITE);
+  SQLite::Database db(ServerSettings::getDBFile(), SQLITE_OPEN_READWRITE);
   string _query(
       "CREATE TABLE [" + table_name
       + "] (File_ID INTEGER PRIMARY KEY AUTOINCREMENT, File_CL TEXT NOT NULL, Last_Modif INTEGER (8) NOT NULL, File_SRV TEXT NOT NULL,  Hash STRING (32), Versione_BCK INTEGER (2));");
   SQLite::Statement query(db, _query);
 
   if (query.exec() == 0) {
-    Logger::write_to_log("Tabella " + table_name + " creata con successo");
+    Logger::writeToLog("Tabella " + table_name + " creata con successo");
     return true;
   } else {
-    Logger::write_to_log("Errore nella creazione della tabella " + table_name, ERROR);
+    Logger::writeToLog("Errore nella creazione della tabella " + table_name, ERROR);
     return false;
   }
 }
 
 // Fornisci i dati relativi ad una specifica cartella
-void Folder::get_folder_stat(int s_c) {
+void Folder::getFolderStat(int s_c) {
 
   if (!isSelected()) {
     throw runtime_error("si sta tentando di operare su una cartella senza averla selezionata");
@@ -57,7 +57,7 @@ void Folder::get_folder_stat(int s_c) {
   int len;
   char buf[MAX_BUF_LEN + 1];
   try {
-    SQLite::Database db("database.db3", SQLITE_OPEN_READONLY);
+    SQLite::Database db(ServerSettings::getDBFile(), SQLITE_OPEN_READONLY);
     // Comunicazione stato cartella nelle varie versioni:
     // - Si invia il numero totale di versioni
     // - Si inizia dalla versione minore (sempre la 1)
@@ -68,7 +68,7 @@ void Folder::get_folder_stat(int s_c) {
     // - n volte quante sono le versioni diverse
     // Conto numero di versioni
     int n_vers = db.execAndGet("SELECT COUNT (DISTINCT Versione_BCK) FROM '" + table_name + "';");
-    Logger::write_to_log("Invio informazioni relative al backup della cartella " + path + ", numero di versioni: " + to_string(n_vers));
+    Logger::writeToLog("Invio informazioni relative al backup della cartella " + path + ", numero di versioni: " + to_string(n_vers));
     // Invio numero totale di versioni
     sprintf(buf, "%d\r\n", n_vers);
     send(s_c, buf, strlen(buf), 0);
@@ -93,7 +93,7 @@ void Folder::get_folder_stat(int s_c) {
         string local_file = query.getColumn("File_SRV");
         File file(nome, (*this), hash, local_file);
         string full_path_file = file.getFullPath();
-        Logger::write_to_log("Invio informazioni relative al file: " + full_path_file, DEBUG, CONSOLE_ONLY);
+        Logger::writeToLog("Invio informazioni relative al file: " + full_path_file, DEBUG, CONSOLE_ONLY);
         // Invio: [Nome file]\r\n[Ultima modifica (16 char)][Hash (32 char)]\r\n
         int cur_file_len = full_path_file.length() + 2/*\r\n*/+ 16 /*Ultima modifica*/+ 32/*Hash*/+ 2/*\r\n*/+ 1/*\0*/;
         char cur_file[cur_file_len] = "";
@@ -107,33 +107,33 @@ void Folder::get_folder_stat(int s_c) {
         }
         buf[len] = '\0';
         if (!strcmp(buf, "DATA_REC")) {
-          Logger::write_to_log("Informazioni file ricevute dal client", DEBUG, CONSOLE_ONLY);
+          Logger::writeToLog("Informazioni file ricevute dal client", DEBUG, CONSOLE_ONLY);
         } else {
           throw runtime_error("ricevuto comando sconosciuto");
         }
       }
-      Logger::write_to_log("Informazioni relative alla versione " + to_string(i) + " inviate correttamente", DEBUG, CONSOLE_ONLY);
+      Logger::writeToLog("Informazioni relative alla versione " + to_string(i) + " inviate correttamente", DEBUG, CONSOLE_ONLY);
     }
     if (n_vers == 0){
-      Logger::write_to_log("Nessuna versione trovata per la cartella " + path);
+      Logger::writeToLog("Nessuna versione trovata per la cartella " + path);
     } else {
-      Logger::write_to_log("Informazioni relative alla cartella " + path + " inviate correttamente");
+      Logger::writeToLog("Informazioni relative alla cartella " + path + " inviate correttamente");
     }
     return;
   } catch (SQLite::Exception& e) {
-    Logger::write_to_log("Errore DB: " + string(e.what()), ERROR);
-    send_command(s_c, "DB_ERROR");
+    Logger::writeToLog("Errore DB: " + string(e.what()), ERROR);
+    sendCommand(s_c, "DB_ERROR");
     return;
   }
 }
 
 // Rimuovi i dati relativi ai file presenti nella cartella
-void Folder::remove_files() {
+void Folder::removeFiles() {
   files.clear();
 }
 
 // Inserimento di un nuovo file nel backup corrente
-bool Folder::new_file_backup(int s_c) {
+bool Folder::newFileBackup(int s_c) {
 
   if (!isSelected()) {
     throw runtime_error("si sta tentando di operare su una cartella senza averla selezionata");
@@ -142,7 +142,7 @@ bool Folder::new_file_backup(int s_c) {
   // Un nuovo file deve essere inserito nel backup corrente:
   // - Si trova la versione di backup corrente
   try {
-    SQLite::Database db("database.db3", SQLITE_OPEN_READWRITE);
+    SQLite::Database db(ServerSettings::getDBFile(), SQLITE_OPEN_READWRITE);
     string _query("SELECT MAX(Versione_BCK) FROM '" + table_name + "';");
     SQLite::Statement query(db, _query);
     query.executeStep();
@@ -150,11 +150,11 @@ bool Folder::new_file_backup(int s_c) {
     // Risultato =/= 0 -> corretto, si aggiunge all'ultimo backup
     if (vrs != 0) {
       vrs += 1;
-      send_command(s_c, "BACKUPOK");
+      sendCommand(s_c, "BACKUPOK");
     } else {
       // Non esiste un backup completo corrente -> Errore
-      Logger::write_to_log("Si sta tentando di aggiungere un file senza avere un backup completo", ERROR);
-      send_command(s_c, "MISS_BCK");
+      Logger::writeToLog("Si sta tentando di aggiungere un file senza avere un backup completo", ERROR);
+      sendCommand(s_c, "MISS_BCK");
       return false;
     }
     query.reset();
@@ -162,26 +162,26 @@ bool Folder::new_file_backup(int s_c) {
     Backup bck(vrs, (*this));
     SQLite::Transaction trs(db);
     // - Si copiano le voci relative all'ultima versione in una nuova versione con gli stessi file
-    SQL_copy_rows(db, (vrs - 1));
+    SQLCopyRows(db, (vrs - 1));
     // - Si riceve il file [receive_file]
     for (int tent = 1; tent < 6;) {
-      if (receive_file(s_c, vrs, db, string())) {
+      if (receiveFile(s_c, vrs, db, string())) {
         // - Se il file e le informazioni sul DB sono state processate correttamente
         // - Commit DB e backup completato
-        send_command(s_c, "DATA_OK_");
+        sendCommand(s_c, "DATA_OK_");
         trs.commit();
         bck.completed();
-        Logger::write_to_log("Ricezione file completata");
+        Logger::writeToLog("Ricezione file completata");
         return true;
       } else {
         if (errno != EEXIST) {
-          Logger::write_to_log("Errore nella ricezione: tentativo " + to_string(tent), ERROR);
-          send_command(s_c, "SNDAGAIN");
+          Logger::writeToLog("Errore nella ricezione: tentativo " + to_string(tent), ERROR);
+          sendCommand(s_c, "SNDAGAIN");
           tent++;
           continue;
         } else {
-          Logger::write_to_log("File già esistente", ERROR);
-          send_command(s_c, "DATA_OK_");
+          Logger::writeToLog("File già esistente", ERROR);
+          sendCommand(s_c, "DATA_OK_");
           trs.commit();
           bck.completed();
           return true;
@@ -190,14 +190,14 @@ bool Folder::new_file_backup(int s_c) {
     }
     return false;
   } catch (SQLite::Exception& e) {
-    Logger::write_to_log("Errore DB: " + string(e.what()), ERROR);
-    send_command(s_c, "DB_ERROR");
+    Logger::writeToLog("Errore DB: " + string(e.what()), ERROR);
+    sendCommand(s_c, "DB_ERROR");
     return false;
   }
 }
 
 // Ricezione di un nuovo file nella cartella
-bool Folder::receive_file(int s_c, int vrs, SQLite::Database& db, string folder_name) {
+bool Folder::receiveFile(int s_c, int vrs, SQLite::Database& db, string folder_name) {
 
   int len;
   string filename;
@@ -244,18 +244,18 @@ bool Folder::receive_file(int s_c, int vrs, SQLite::Database& db, string folder_
     // SQL: DELETE FROM '[nome_table]' WHERE Versione_BCK=[vrs] AND Hash=file.getHash()
     string _query("DELETE FROM '" + table_name + "' WHERE Versione_BCK=" + to_string(vrs) + " AND File_CL='" + file.getName() + "';");
     SQLite::Statement query(db, _query);
-    Logger::write_to_log("File: " + file.getFullPath() + ", Dimensione: " + to_string(file.getSize()) + " Byte, MD5: " + string(file.getHash()) + ", Timestamp: " + to_string(file.getTimestamp()),
+    Logger::writeToLog("File: " + file.getFullPath() + ", Dimensione: " + to_string(file.getSize()) + " Byte, MD5: " + string(file.getHash()) + ", Timestamp: " + to_string(file.getTimestamp()),
         DEBUG, LOG_ONLY);
     if (query.exec() == 0) {
       // Non è un aggiornamento, ma un inserimento
-      Logger::write_to_log("Il file non è un aggiornamento, ma un file nuovo", DEBUG, LOG_ONLY);
+      Logger::writeToLog("Il file non è un aggiornamento, ma un file nuovo", DEBUG, LOG_ONLY);
     } else {
-      Logger::write_to_log("Il file è un aggiornamento", DEBUG, LOG_ONLY);
+      Logger::writeToLog("Il file è un aggiornamento", DEBUG, LOG_ONLY);
     }
     // Invio conferma ricezione dati
-    send_command(s_c, "INFO_OK_");
+    sendCommand(s_c, "INFO_OK_");
     // Ricezione contenuto del file
-    if (file.receive_file_data(s_c, folder_name)) {
+    if (file.receiveFileData(s_c, folder_name)) {
       /* Inserimento file nel database */;
       string _query("INSERT INTO '" + table_name + "' (File_CL, Last_Modif, File_SRV, Hash, Versione_BCK) VALUES (?, ?, ?, ?, ?);");
       SQLite::Statement query(db, _query);
@@ -265,9 +265,9 @@ bool Folder::receive_file(int s_c, int vrs, SQLite::Database& db, string folder_
       query.bind(4, file.getHash());
       query.bind(5, vrs);
       if (query.exec() == 1) {
-        Logger::write_to_log("Entry relativa al file inserita con successo");
+        Logger::writeToLog("Entry relativa al file inserita con successo");
         file.completed();
-        insert_file(file);
+        insertFile(file);
         return true;
       } else {
         return false;
@@ -276,13 +276,13 @@ bool Folder::receive_file(int s_c, int vrs, SQLite::Database& db, string folder_
       return false;
     }
   } catch (ios_base::failure &e) {
-    Logger::write_to_log("Errore nella scrittura del file: " + string(e.what()), ERROR);
+    Logger::writeToLog("Errore nella scrittura del file: " + string(e.what()), ERROR);
     return false;
   }
 }
 
 // Copia delle voci relative all'ultima versione in una nuova versione con gli stessi file
-void Folder::SQL_copy_rows(SQLite::Database& db, int vrs) {
+void Folder::SQLCopyRows(SQLite::Database& db, int vrs) {
   // CREATE TABLE 'temporary_table' AS SELECT * FROM '[nome_table]' WHERE Versione_BCK= ?;
   string table("temporary_table" + user.getUser());
   string _query = "CREATE TABLE '" + table + "' AS SELECT * FROM '" + table_name + "' WHERE Versione_BCK= ?;";
@@ -308,7 +308,7 @@ void Folder::SQL_copy_rows(SQLite::Database& db, int vrs) {
 }
 
 // Eliminazione di un file dal backup corrente
-bool Folder::delete_file_backup(int s_c) {
+bool Folder::deleteFileBackup(int s_c) {
   // Un file deve essere eliminato dal backup corrente:
   // - Si trova la versione di backup corrente
   if (!isSelected()) {
@@ -317,7 +317,7 @@ bool Folder::delete_file_backup(int s_c) {
   int vrs;
   char buffer[MAX_BUF_LEN];
   try {
-    SQLite::Database db("database.db3", SQLITE_OPEN_READWRITE);
+    SQLite::Database db(ServerSettings::getDBFile(), SQLITE_OPEN_READWRITE);
     string _query("SELECT MAX(Versione_BCK) FROM '" + table_name + "';");
     SQLite::Statement query(db, _query);
     if (query.executeStep()) {
@@ -325,16 +325,16 @@ bool Folder::delete_file_backup(int s_c) {
       vrs = query.getColumn(0).getInt() + 1;
     } else {
       // Non esiste un backup completo corrente -> Errore
-      Logger::write_to_log("Non esiste un backup completo corrente", ERROR);
-      send_command(s_c, "MISS_BCK");
+      Logger::writeToLog("Non esiste un backup completo corrente", ERROR);
+      sendCommand(s_c, "MISS_BCK");
       return false;
     }
     query.reset();
-    Logger::write_to_log("Backup trovato, versione corrente: " + to_string(vrs - 1));
+    Logger::writeToLog("Backup trovato, versione corrente: " + to_string(vrs - 1));
     // - Si apre una transazione sul DB
     SQLite::Transaction trs(db);
     // - Si copiano le voci relative all'ultima versione in una nuova versione con gli stessi file
-    SQL_copy_rows(db, (vrs - 1));
+    SQLCopyRows(db, (vrs - 1));
     // - Ricezione nome del file da eliminare
     int len;
     len = recv(s_c, buffer, MAX_BUF_LEN, 0);
@@ -344,8 +344,8 @@ bool Folder::delete_file_backup(int s_c) {
     }
     buffer[len] = '\0';
     string filename = string(buffer).substr(path.length()+1, string::npos);
-    Logger::write_to_log("File da eliminare: " + filename);
-    send_command(s_c, "INFO_OK_");
+    Logger::writeToLog("File da eliminare: " + filename);
+    sendCommand(s_c, "INFO_OK_");
     _query.assign("DELETE FROM '" + table_name + "' WHERE File_CL = ? AND Versione_BCK = ?;");
     SQLite::Statement query_1(db, _query);
     query_1.bind(1, filename);
@@ -354,25 +354,25 @@ bool Folder::delete_file_backup(int s_c) {
     if (query_1.exec() == 1) {
       // Eliminazione corretta di UNA SOLA riga
       trs.commit();
-      Logger::write_to_log("File rimosso correttamente dal backup corrente");
-      send_command(s_c, "DELETED_");
+      Logger::writeToLog("File rimosso correttamente dal backup corrente");
+      sendCommand(s_c, "DELETED_");
       return true;
     } else {
       // Eliminazione di nessuna riga della tabella
-      Logger::write_to_log("File non esistente", ERROR);
-      send_command(s_c, "NOT_DEL_");
+      Logger::writeToLog("File non esistente", ERROR);
+      sendCommand(s_c, "NOT_DEL_");
       return false;
     }
   } catch (SQLite::Exception& e) {
-    Logger::write_to_log("Errore DB: " + string(e.what()), ERROR);
-    send_command(s_c, "DB_ERROR");
+    Logger::writeToLog("Errore DB: " + string(e.what()), ERROR);
+    sendCommand(s_c, "DB_ERROR");
     return false;
   }
   return false;
 }
 
 // Ricezione di un nuovo backup completo
-bool Folder::full_backup(int s_c) {
+bool Folder::fullBackup(int s_c) {
 
   if (!isSelected()) {
     throw runtime_error("si sta tentando di operare su una cartella senza averla selezionata");
@@ -383,7 +383,7 @@ bool Folder::full_backup(int s_c) {
   // Creazione nuova versione backup nel DB
   // Lettura versione attuale
   try {
-    SQLite::Database db("database.db3", SQLITE_OPEN_READWRITE);
+    SQLite::Database db(ServerSettings::getDBFile(), SQLITE_OPEN_READWRITE);
     string _query("SELECT MAX(Versione_BCK) FROM '" + table_name + "';");
     SQLite::Statement query(db, _query);
     // Esecuzione query -> una sola riga di risultato (SELECT MAX)
@@ -399,7 +399,7 @@ bool Folder::full_backup(int s_c) {
 
     Backup backup(vrs, (*this));
     SQLite::Transaction trs(db);
-    string folder_name("./ReceivedFiles/" + user.getUser() + "_" + path + "_FBck_" + to_string(time(NULL)));
+    string folder_name("./" + ServerSettings::getFilesFolder() + "/" + user.getUser() + "_" + path + "_FBck_" + to_string(time(NULL)));
 
     // Attesa comando: 	- se REC_FILE -> nuovo file in arrivo
     //					        - se SYNC_END -> fine backup
@@ -412,13 +412,13 @@ bool Folder::full_backup(int s_c) {
       comm[len] = '\0';
       if (!strcmp(comm, "REC_FILE")) {
         // Ricevi file
-        if (receive_file(s_c, vrs, db, folder_name)) {
+        if (receiveFile(s_c, vrs, db, folder_name)) {
           // File ricevuto correttamente
-          send_command(s_c, "DATA_OK_");
+          sendCommand(s_c, "DATA_OK_");
           continue;
         } else {
           // Errore nella ricezione del file, richiesta nuova spedizione
-          send_command(s_c, "SNDAGAIN");
+          sendCommand(s_c, "SNDAGAIN");
           continue;
         }
       } else if (!strcmp(comm, "SYNC_END")) {
@@ -428,29 +428,29 @@ bool Folder::full_backup(int s_c) {
         break;
       } else {
         // Comando sconosciuto
-        send_command(s_c, "UNKNOWN_");
+        sendCommand(s_c, "UNKNOWN_");
         break;
       }
     }
     if (backup.isComplete() && trs.isCommitted()) {
       // Se la transazione ha avuto commit e il backup è completo
-      Logger::write_to_log("Backup ricevuto con successo");
+      Logger::writeToLog("Backup ricevuto con successo");
       return true;
     } else {
       // Se la transazione non ha avuto commit
       // Rollback e cancellazione file
-      Logger::write_to_log("Errore nella ricezione del backup, annullamento operazione");
+      Logger::writeToLog("Errore nella ricezione del backup, annullamento operazione");
       return false;
     }
   } catch (SQLite::Exception& e) {
-    Logger::write_to_log("Errore DB: " + string(e.what()), ERROR);
-    send_command(s_c, "DB_ERROR");
+    Logger::writeToLog("Errore DB: " + string(e.what()), ERROR);
+    sendCommand(s_c, "DB_ERROR");
     return false;
   }
 }
 
 // Invio di un backup completo
-void Folder::send_backup(int s_c) {
+void Folder::sendBackup(int s_c) {
 
   // Invio backup completo:
   // - Si attende che l'utente selezioni la versione desiderata
@@ -464,7 +464,7 @@ void Folder::send_backup(int s_c) {
   buffer[len] = '\0'; // -> es. buffer: "1\0"
   int vrs = strtol(buffer, NULL, 10); // -> es. vrs = 1
   try {
-    SQLite::Database db("database.db3");
+    SQLite::Database db(ServerSettings::getDBFile());
     int count = db.execAndGet("SELECT COUNT (*) FROM '" + table_name + "' WHERE Versione_BCK = " + to_string(vrs));
     SQLite::Statement query(db, "SELECT * FROM '" + table_name + "' WHERE Versione_BCK = ?");
     query.bind(2, vrs);
@@ -477,16 +477,16 @@ void Folder::send_backup(int s_c) {
       string local_file = query.getColumn("File_SRV");	// Posizione del file sul file system
       // Oggetto 'file', senza timestamp (non serve in questo caso) e dimensione (non serve in questo caso)
       File file(filename, (*this), hash, local_file);
-      file.send_file_data(s_c);
+      file.sendFileData(s_c);
     }
   } catch (SQLite::Exception& e) {
-    Logger::write_to_log("Errore DB: " + string(e.what()), ERROR);
-    send_command(s_c, "DB_ERROR");
+    Logger::writeToLog("Errore DB: " + string(e.what()), ERROR);
+    sendCommand(s_c, "DB_ERROR");
   }
 }
 
 // Invio di un singolo file da un backup
-void Folder::send_single_file(int s_c) {
+void Folder::sendSingleFile(int s_c) {
 
   // Invio file singolo da backup:
   // - Si attende il nome del file richiesto dall'utente e il numero di versione
@@ -500,10 +500,10 @@ void Folder::send_single_file(int s_c) {
   string file_req = strtok(buffer, "\r\n"); // -> es. file_req = "file.txt"
   int vrs = strtol((strtok(NULL, "\r\n")), NULL, 10); // -> es. vrs = 1
   string filename = string(buffer).substr(path.length()+1, string::npos);
-  Logger::write_to_log("Richiesto file " + filename + ", dalla versione " + to_string(vrs));
+  Logger::writeToLog("Richiesto file " + filename + ", dalla versione " + to_string(vrs));
   // - Si spedisce il file richiesto
   try {
-    SQLite::Database db("database.db3");
+    SQLite::Database db(ServerSettings::getDBFile());
     SQLite::Statement query(db, "SELECT * FROM '" + table_name + "' WHERE File_CL = ? AND Versione_BCK = ?");
     query.bind(1, file_req);
     query.bind(2, vrs);
@@ -514,9 +514,9 @@ void Folder::send_single_file(int s_c) {
     string local_file = query.getColumn("File_SRV");
     // Oggetto 'file', senza timestamp (non serve in questo caso) e dimensione (non serve in questo caso)
     File file(filename, (*this), hash, local_file);
-    file.send_file_data(s_c);
+    file.sendFileData(s_c);
   } catch (SQLite::Exception& e) {
-    Logger::write_to_log("Errore DB: " + string(e.what()), ERROR);
-    send_command(s_c, "DB_ERROR");
+    Logger::writeToLog("Errore DB: " + string(e.what()), ERROR);
+    sendCommand(s_c, "DB_ERROR");
   }
 }

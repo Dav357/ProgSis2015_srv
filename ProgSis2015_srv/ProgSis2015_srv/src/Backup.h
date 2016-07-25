@@ -8,8 +8,6 @@
 #ifndef BACKUP_H_
 #define BACKUP_H_
 
-bool full_backup(int, Folder&);
-
 class Backup {
 private:
   int vers;
@@ -24,6 +22,7 @@ public:
   }
 };
 
-void db_maintenance(std::string);
+void dbMaintenance(std::string);
+bool fullBackup(int, Folder&);
 
 #endif /* BACKUP_H_ */
