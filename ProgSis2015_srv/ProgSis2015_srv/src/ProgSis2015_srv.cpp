@@ -227,7 +227,7 @@ int main(int argc, char** argv) {
       pid = fork();
       if (pid == -1) {
         Logger::writeToLog("Errore nella funzione fork()", ERROR);
-        exit(EXIT_FAILURE);
+        return (EXIT_FAILURE);
       } else if (pid == 0) {
         // Processo figlio
         Logger::reopenLog("[" + to_string(getpid()) + "] debug.child.log");
@@ -235,7 +235,7 @@ int main(int argc, char** argv) {
         close(s);
         serverFunction(s_c, getpid());
         close(s_c);
-        exit(EXIT_SUCCESS);
+        return (EXIT_SUCCESS);
       } else {
         // Processo padre
         Logger::writeToLog("Il processo [" + to_string(pid) + "] è connesso all'host: " + string(inet_ntoa(claddr.sin_addr)));
@@ -343,7 +343,7 @@ void serverFunction(int s_c, int pid) {
           Logger::writeToLog("Disconnessione effettuata");
           break;
         default:
-          throw runtime_error("ricevuto comando sconosciuto");
+          throw runtime_error("ricevuto comando sconosciuto: " + string(comm));
       }
     }
   } catch (runtime_error& e) {

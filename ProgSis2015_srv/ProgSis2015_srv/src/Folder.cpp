@@ -109,7 +109,7 @@ void Folder::getFolderStat(int s_c) {
         if (!strcmp(buf, "DATA_REC")) {
           Logger::writeToLog("Informazioni file ricevute dal client", DEBUG, CONSOLE_ONLY);
         } else {
-          throw runtime_error("ricevuto comando sconosciuto");
+          throw runtime_error("ricevuto comando sconosciuto: " + string(buf));
         }
       }
       Logger::writeToLog("Informazioni relative alla versione " + to_string(i) + " inviate correttamente", DEBUG, CONSOLE_ONLY);
@@ -467,7 +467,7 @@ void Folder::sendBackup(int s_c) {
     SQLite::Database db(ServerSettings::getDBFile());
     int count = db.execAndGet("SELECT COUNT (*) FROM '" + table_name + "' WHERE Versione_BCK = " + to_string(vrs));
     SQLite::Statement query(db, "SELECT * FROM '" + table_name + "' WHERE Versione_BCK = ?");
-    query.bind(2, vrs);
+    query.bind(1, vrs);
     // - Si spedisce la versione selezionata, un file per volta
     for (int i = 0; i < count; i++) {
       query.executeStep();
@@ -477,6 +477,8 @@ void Folder::sendBackup(int s_c) {
       string local_file = query.getColumn("File_SRV");	// Posizione del file sul file system
       // Oggetto 'file', senza timestamp (non serve in questo caso) e dimensione (non serve in questo caso)
       File file(filename, (*this), hash, local_file);
+      string full_path_file = file.getFullPath();
+      send(s_c, full_path_file.c_str(), full_path_file.length(), 0);
       file.sendFileData(s_c);
     }
   } catch (SQLite::Exception& e) {
@@ -505,12 +507,12 @@ void Folder::sendSingleFile(int s_c) {
   try {
     SQLite::Database db(ServerSettings::getDBFile());
     SQLite::Statement query(db, "SELECT * FROM '" + table_name + "' WHERE File_CL = ? AND Versione_BCK = ?");
-    query.bind(1, file_req);
+    query.bind(1, filename);
     query.bind(2, vrs);
     query.executeStep();
     // Lettura dati file
     string filename = query.getColumn("File_CL");		// Nome del file nel client
-    string hash = query.getColumn("Hash");				// Hash del file
+    string hash = query.getColumn("Hash");			// Hash del file
     string local_file = query.getColumn("File_SRV");
     // Oggetto 'file', senza timestamp (non serve in questo caso) e dimensione (non serve in questo caso)
     File file(filename, (*this), hash, local_file);

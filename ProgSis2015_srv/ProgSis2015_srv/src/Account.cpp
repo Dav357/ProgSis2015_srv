@@ -72,10 +72,10 @@ char Account::accountManag(int flags) {
   SQLite::Database db(ServerSettings::getDBFile(), flags);
   if (flags == LOGIN) {
     // Login
-    _query.assign("SELECT * FROM 'users' WHERE 'username' = ? AND 'sha2_pass' = ?");
+    _query.assign("SELECT * FROM 'users' WHERE username = ? AND sha2_pass = ?;");
   } else {
     // Creazione account
-    _query.assign("INSERT INTO 'users' ('username', 'sha2_pass') VALUES (?, ?)");
+    _query.assign("INSERT INTO 'users' ('username', 'sha2_pass') VALUES (?, ?);");
   }
   SQLite::Statement query(db, _query);
   query.bind(1, usr);

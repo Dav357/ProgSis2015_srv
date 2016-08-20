@@ -15,7 +15,7 @@
 #include <cstdio>
 #include <unistd.h>
 #include <string>
-#include <string.h>
+#include <cstring>
 #include <chrono>
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -27,7 +27,6 @@
 #include "File.h"
 #include "Folder.h"
 #include "Backup.h"
-//#include "SQLiteCpp/SQLiteCpp.h"
 
 // Flag per l'operazione di login
 const char LOGIN = 0x01;

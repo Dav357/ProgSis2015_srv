@@ -11,6 +11,9 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <cstring>
+#include <sys/time.h>
+#include <locale.h>
 
 const int DEBUG = 0x0001;
 const int ERROR = 0x0002;
@@ -30,6 +33,7 @@ private:
 
   static struct timeval start_program_time;
   static std::ofstream general_log;
+  static void ANSIitoUTF(char*);
 };
 
 #endif /* LOGGER_H_ */

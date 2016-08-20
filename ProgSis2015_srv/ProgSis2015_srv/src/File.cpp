@@ -94,9 +94,7 @@ bool File::receiveFileData(int s_c, string folder_name) {
     size_t received = 0;
     for (;;) {
       rbyte = recv(s_c, buffer, MAX_BUF_LEN, 0);
-      if (rbyte == 0 || rbyte == -1)
-        break;
-        //throw runtime_error("connessione persa");
+      if (rbyte == 0 || rbyte == -1) break;
       write(fpoint, buffer, rbyte);
       received += rbyte;
       if (received == size) {
@@ -146,7 +144,7 @@ bool File::hashCheck(int fpoint) {
 // Invio dei byte che compongono il file
 void File::sendFileData(int s_c) {
 
-  char comm[COMM_LEN+1] = "", buffer[MAX_BUF_LEN + 1] = "";
+  char comm[COMM_LEN + 1] = "", buffer[MAX_BUF_LEN + 1] = "";
   int fpoint = open(save_path.c_str(), O_RDONLY);
   send(s_c, hash.c_str(), hash.length(), 0);
   int len = recv(s_c, comm, COMM_LEN, 0);
@@ -158,10 +156,34 @@ void File::sendFileData(int s_c) {
   if (!strcmp(comm, "DATA_REC")) {
     Logger::writeToLog("Hash del file ricevuto dal client", DEBUG, CONSOLE_ONLY);
   } else {
-    throw runtime_error("ricevuto comando sconosciuto");
+    // Comando sconosciuto
+    sendCommand(s_c, "UNKNOWN_");
+    throw runtime_error("ricevuto comando sconosciuto: " + string(comm));
   }
-  while ((len = read(fpoint, buffer, MAX_BUF_LEN)) > 0) {
-    send(s_c, buffer, len, 0);
+  for (int i = 1; i < 6; i++) {
+    lseek(fpoint, 0, SEEK_SET);
+    while ((len = read(fpoint, buffer, MAX_BUF_LEN)) > 0) {
+      send(s_c, buffer, len, 0);
+    }
+    len = recv(s_c, comm, COMM_LEN, 0);
+    if ((len == 0) || (len == -1)) {
+      // Ricevuta stringa vuota: connessione persa
+      throw runtime_error("connessione persa");
+    }
+    comm[len] = '\0';
+    if (!strcmp(comm, "DATA_OK_")) {
+      // File spedito correttamente
+      close(fpoint);
+      Logger::writeToLog("File ricevuto correttamente dal client");
+      return;
+    } else if (!strcmp(comm, "SNDAGAIN")) {
+      // Errore nella spedizione del file, ripetere
+      Logger::writeToLog("Richiesta nuova spedizione del file, tentativo: " + (i+1) , DEBUG, CONSOLE_ONLY);
+      continue;
+    } else {
+      // Comando sconosciuto
+      sendCommand(s_c, "UNKNOWN_");
+      throw runtime_error("ricevuto comando sconosciuto: " + string(comm));
+    }
   }
-  close(fpoint);
 }
