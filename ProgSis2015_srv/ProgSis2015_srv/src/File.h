@@ -2,8 +2,9 @@
  * File.h
  *
  *  Created on: 07 ago 2015
- *      Author: davide
+ *      Author: Davide Locatelli
  */
+
 #ifndef FILE_H_
 #define FILE_H_
 
@@ -30,7 +31,7 @@ private:
 public:
   File(std::string, Folder&, size_t, time_t, std::string);
   /* Costruttore per invio file */
-  File(std::string, Folder&, std::string, std::string);
+  File(std::string, Folder&, time_t, std::string, std::string);
   /* -------------------------- */
   virtual ~File();
   std::string getFullPath();

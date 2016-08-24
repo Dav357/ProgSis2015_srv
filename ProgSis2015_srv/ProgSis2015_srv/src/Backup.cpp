@@ -2,7 +2,7 @@
  * Backup.cpp
  *
  *  Created on: 10 ago 2015
- *      Author: davide
+ *      Author: Davide Locatelli
  */
 
 #include "GenIncludes.hpp"
@@ -82,7 +82,7 @@ void dbMaintenance(string table_name) {
     // Si cancellano i file indicati nel set 'cancellare'
     for (string f : cancellare) {
       remove(f.c_str());
-      Logger::writeToLog("File " + f + "eliminato", DEBUG, LOG_ONLY);
+      Logger::writeToLog("File " + f + " eliminato", DEBUG, LOG_ONLY);
     }
     Logger::writeToLog("Tutti i file obsoleti sono stati eliminati");
 

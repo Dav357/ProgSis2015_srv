@@ -2,7 +2,7 @@
  * Backup.h
  *
  *  Created on: 10 ago 2015
- *      Author: davide
+ *      Author: Davide Locatelli
  */
 
 #ifndef BACKUP_H_

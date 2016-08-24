@@ -2,7 +2,7 @@
  * File.cpp
  *
  *  Created on: 07 ago 2015
- *      Author: davide
+ *      Author: Davide Locatelli
  */
 
 #include "GenIncludes.hpp"
@@ -25,12 +25,12 @@ File::File(string fullpath, Folder& folder, size_t size, time_t timestamp, strin
 }
 
 // Costruttore per invio file
-File::File(string filename, Folder& folder, string h, string savepath) :
+File::File(string filename, Folder& folder, time_t t, string h, string savepath) :
     base_path(folder) {
 
   this->filename = filename;
   size = 0;
-  timestamp = 0;
+  timestamp = t;
   hash = h;
   save_path = savepath;
   complete = true;
@@ -146,7 +146,9 @@ void File::sendFileData(int s_c) {
 
   char comm[COMM_LEN + 1] = "", buffer[MAX_BUF_LEN + 1] = "";
   int fpoint = open(save_path.c_str(), O_RDONLY);
-  send(s_c, hash.c_str(), hash.length(), 0);
+  size = lseek(fpoint, 0, SEEK_END);
+  sprintf(buffer, "%s\r\n%lX\r\n%016lX\r\n", hash.c_str(), size, timestamp);
+  if (send(s_c, buffer, strlen(buffer), 0) == -1) throw runtime_error("connessione persa");
   int len = recv(s_c, comm, COMM_LEN, 0);
   if ((len == 0) || (len == -1)) {
     // Ricevuta stringa vuota: connessione persa
@@ -163,7 +165,7 @@ void File::sendFileData(int s_c) {
   for (int i = 1; i < 6; i++) {
     lseek(fpoint, 0, SEEK_SET);
     while ((len = read(fpoint, buffer, MAX_BUF_LEN)) > 0) {
-      send(s_c, buffer, len, 0);
+      if (send(s_c, buffer, len, 0) == -1) throw runtime_error("connessione persa");
     }
     len = recv(s_c, comm, COMM_LEN, 0);
     if ((len == 0) || (len == -1)) {
@@ -178,7 +180,7 @@ void File::sendFileData(int s_c) {
       return;
     } else if (!strcmp(comm, "SNDAGAIN")) {
       // Errore nella spedizione del file, ripetere
-      Logger::writeToLog("Richiesta nuova spedizione del file, tentativo: " + (i+1) , DEBUG, CONSOLE_ONLY);
+      Logger::writeToLog("Richiesta nuova spedizione del file, tentativo: " + (i + 1), DEBUG, CONSOLE_ONLY);
       continue;
     } else {
       // Comando sconosciuto

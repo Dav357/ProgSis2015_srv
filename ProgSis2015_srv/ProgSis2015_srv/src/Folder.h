@@ -2,7 +2,7 @@
  * Folder.h
  *
  *  Created on: 05 ago 2015
- *      Author: davide
+ *      Author: Davide Locatelli
  */
 
 #ifndef FOLDER_H_

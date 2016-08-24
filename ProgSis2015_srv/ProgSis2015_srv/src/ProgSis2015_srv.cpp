@@ -1,9 +1,8 @@
 //============================================================================
 // Name        : ProgSis2015_srv.cpp
-// Author      : Davide
-// Version     :
-// Copyright   :
-// Description : Main program
+// Author      : Davide Locatelli
+// Version     : 0.9
+// Description : Parte principale del server
 //============================================================================
 #include "GenIncludes.hpp"
 
@@ -117,10 +116,10 @@ static void initialize() {
 
 int main(int argc, char** argv) {
 
-  int port = 0, pid, optval = 1;
+  int port = 0, pid/*, optval = 1*/;
   bool manag = false;
   string config_file_name;
-  socklen_t optlen = sizeof(optval);
+  //socklen_t optlen = sizeof(optval);
   struct sockaddr_in saddr, claddr;
   socklen_t claddr_len = sizeof(struct sockaddr_in);
   int s, s_c; //Socket
@@ -176,12 +175,12 @@ int main(int argc, char** argv) {
   saddr.sin_family = AF_INET;
   saddr.sin_port = htons(port);
   // Impostazione di SO_KEEPALIVE
-  if (setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen) < 0) {
-    Logger::writeToLog("Errore nell'impostazione delle opzioni del socket, chiusura programma", ERROR);
-    close(s);
-    return (EXIT_FAILURE);
-  }
-  Logger::writeToLog("Impostazione SO_KEEPALIVE del socket applicata correttamente", DEBUG, LOG_ONLY);
+//  if (setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen) < 0) {
+//    Logger::writeToLog("Errore nell'impostazione delle opzioni del socket, chiusura programma", ERROR);
+//    close(s);
+//    return (EXIT_FAILURE);
+//  }
+//  Logger::writeToLog("Impostazione SO_KEEPALIVE del socket applicata correttamente", DEBUG, LOG_ONLY);
   // Bind del socket e listen
   if (bind(s, (struct sockaddr*) &saddr, sizeof(saddr)) == -1) {
     Logger::writeToLog("Errore nel binding del socket, chiusura programma", ERROR);
@@ -359,7 +358,7 @@ void serverFunction(int s_c, int pid) {
 
 // Invio di un comando all'host
 void sendCommand(int s_c, const char *command) {
-  send(s_c, command, COMM_LEN, 0);
+  if (send(s_c, command, COMM_LEN, 0) == -1) throw runtime_error("connessione persa");
 }
 
 /* GESTIONE USERTABLE */

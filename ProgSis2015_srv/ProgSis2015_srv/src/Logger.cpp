@@ -2,7 +2,7 @@
  * Logger.cpp
  *
  *  Created on: 20 ago 2015
- *      Author: davide
+ *      Author: Davide Locatelli
  */
 
 #include "Logger.h"

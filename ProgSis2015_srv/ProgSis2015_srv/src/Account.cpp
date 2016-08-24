@@ -1,3 +1,10 @@
+/*
+ * Account.cpp
+ *
+ *  Created on: 05 ago 2015
+ *      Author: Davide Locatelli
+ */
+
 #include "GenIncludes.hpp"
 #include "Account.h"
 

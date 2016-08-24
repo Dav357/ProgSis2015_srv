@@ -2,7 +2,7 @@
  * Folder.cpp
  *
  *  Created on: 05 ago 2015
- *      Author: davide
+ *      Author: Davide Locatelli
  */
 
 #include "GenIncludes.hpp"
@@ -11,7 +11,7 @@ using namespace std;
 
 // Costruttore
 Folder::Folder(string p, Account& user) :
-        user(user) {
+    user(user) {
 
   string tmp("table_" + user.getUser() + "_" + p);
   path = p;
@@ -36,7 +36,7 @@ bool Folder::createTableFolder() {
   SQLite::Database db(ServerSettings::getDBFile(), SQLITE_OPEN_READWRITE);
   string _query(
       "CREATE TABLE [" + table_name
-      + "] (File_ID INTEGER PRIMARY KEY AUTOINCREMENT, File_CL TEXT NOT NULL, Last_Modif INTEGER (8) NOT NULL, File_SRV TEXT NOT NULL,  Hash STRING (32), Versione_BCK INTEGER (2));");
+          + "] (File_ID INTEGER PRIMARY KEY AUTOINCREMENT, File_CL TEXT NOT NULL, Last_Modif INTEGER (8) NOT NULL, File_SRV TEXT NOT NULL,  Hash STRING (32), Versione_BCK INTEGER (2));");
   SQLite::Statement query(db, _query);
 
   if (query.exec() == 0) {
@@ -71,19 +71,19 @@ void Folder::getFolderStat(int s_c) {
     Logger::writeToLog("Invio informazioni relative al backup della cartella " + path + ", numero di versioni: " + to_string(n_vers));
     // Invio numero totale di versioni
     sprintf(buf, "%d\r\n", n_vers);
-    send(s_c, buf, strlen(buf), 0);
+    if (send(s_c, buf, strlen(buf), 0) == -1) throw runtime_error("connessione persa");
     for (int i = 1; i <= n_vers; i++) {
       // Versione i
       // Invio numero versione
       sprintf(buf, "%d\r\n", i);
-      send(s_c, buf, strlen(buf), 0);
+      if (send(s_c, buf, strlen(buf), 0) == -1) throw runtime_error("connessione persa");
       string _query("SELECT File_CL, Last_Modif, Hash, File_SRV FROM '" + table_name + "' WHERE Versione_BCK = ?;");
       SQLite::Statement query(db, _query);
       query.bind(1, i);
       int count = db.execAndGet("SELECT COUNT (*) FROM '" + table_name + "' WHERE Versione_BCK = " + to_string(i) + ";");
       // Invio del numero di file per la versione corrente
       sprintf(buf, "%d\r\n", count);
-      send(s_c, buf, strlen(buf), 0);
+      if (send(s_c, buf, strlen(buf), 0) == -1) throw runtime_error("connessione persa");
       // Dato il numero di backup = i inviare per ogni file:
       for (int j = 0; j < count; j++) {
         query.executeStep();
@@ -91,7 +91,7 @@ void Folder::getFolderStat(int s_c) {
         time_t timestamp = query.getColumn("Last_Modif");
         string hash = query.getColumn("Hash");
         string local_file = query.getColumn("File_SRV");
-        File file(nome, (*this), hash, local_file);
+        File file(nome, (*this), timestamp, hash, local_file);
         string full_path_file = file.getFullPath();
         Logger::writeToLog("Invio informazioni relative al file: " + full_path_file, DEBUG, CONSOLE_ONLY);
         // Invio: [Nome file]\r\n[Ultima modifica (16 char)][Hash (32 char)]\r\n
@@ -99,7 +99,7 @@ void Folder::getFolderStat(int s_c) {
         char cur_file[cur_file_len] = "";
         sprintf(cur_file, "%s\r\n%016lX%s\r\n", full_path_file.c_str(), timestamp, hash.c_str());
         /*string to_send(nome + "\r\n" + to_string(timestamp) + hash + "\r\n");*/
-        send(s_c, cur_file, cur_file_len-1, 0);
+        if (send(s_c, cur_file, cur_file_len - 1, 0) == -1) throw runtime_error("connessione persa");
         len = recv(s_c, buf, COMM_LEN, 0);
         if ((len == 0) || (len == -1)) {
           // Ricevuta stringa vuota: connessione persa
@@ -114,7 +114,7 @@ void Folder::getFolderStat(int s_c) {
       }
       Logger::writeToLog("Informazioni relative alla versione " + to_string(i) + " inviate correttamente", DEBUG, CONSOLE_ONLY);
     }
-    if (n_vers == 0){
+    if (n_vers == 0) {
       Logger::writeToLog("Nessuna versione trovata per la cartella " + path);
     } else {
       Logger::writeToLog("Informazioni relative alla cartella " + path + " inviate correttamente");
@@ -244,8 +244,8 @@ bool Folder::receiveFile(int s_c, int vrs, SQLite::Database& db, string folder_n
     // SQL: DELETE FROM '[nome_table]' WHERE Versione_BCK=[vrs] AND Hash=file.getHash()
     string _query("DELETE FROM '" + table_name + "' WHERE Versione_BCK=" + to_string(vrs) + " AND File_CL='" + file.getName() + "';");
     SQLite::Statement query(db, _query);
-    Logger::writeToLog("File: " + file.getFullPath() + ", Dimensione: " + to_string(file.getSize()) + " Byte, MD5: " + string(file.getHash()) + ", Timestamp: " + to_string(file.getTimestamp()),
-        DEBUG, LOG_ONLY);
+    Logger::writeToLog("File: " + file.getFullPath() + ", Dimensione: " + to_string(file.getSize()) + " Byte, MD5: " + string(file.getHash()) + ", Timestamp: " + to_string(file.getTimestamp()), DEBUG,
+        LOG_ONLY);
     if (query.exec() == 0) {
       // Non è un aggiornamento, ma un inserimento
       Logger::writeToLog("Il file non è un aggiornamento, ma un file nuovo", DEBUG, LOG_ONLY);
@@ -343,7 +343,7 @@ bool Folder::deleteFileBackup(int s_c) {
       throw runtime_error("connessione persa");
     }
     buffer[len] = '\0';
-    string filename = string(buffer).substr(path.length()+1, string::npos);
+    string filename = string(buffer).substr(path.length() + 1, string::npos);
     Logger::writeToLog("File da eliminare: " + filename);
     sendCommand(s_c, "INFO_OK_");
     _query.assign("DELETE FROM '" + table_name + "' WHERE File_CL = ? AND Versione_BCK = ?;");
@@ -455,7 +455,7 @@ void Folder::sendBackup(int s_c) {
   // Invio backup completo:
   // - Si attende che l'utente selezioni la versione desiderata
   char buffer[MAX_BUF_LEN + 1];
-  // Versione
+  // Ricezione numero di versione
   int len = recv(s_c, buffer, MAX_BUF_LEN, 0);
   if ((len == 0) || (len == -1)) {
     // Ricevuta stringa vuota: connessione persa
@@ -463,6 +463,7 @@ void Folder::sendBackup(int s_c) {
   }
   buffer[len] = '\0'; // -> es. buffer: "1\0"
   int vrs = strtol(buffer, NULL, 10); // -> es. vrs = 1
+  Logger::writeToLog("Richiesto ripristino versione " + to_string(vrs));
   try {
     SQLite::Database db(ServerSettings::getDBFile());
     int count = db.execAndGet("SELECT COUNT (*) FROM '" + table_name + "' WHERE Versione_BCK = " + to_string(vrs));
@@ -475,10 +476,13 @@ void Folder::sendBackup(int s_c) {
       string filename = query.getColumn("File_CL");		// Nome del file nel client
       string hash = query.getColumn("Hash");				// Hash del file
       string local_file = query.getColumn("File_SRV");	// Posizione del file sul file system
-      // Oggetto 'file', senza timestamp (non serve in questo caso) e dimensione (non serve in questo caso)
-      File file(filename, (*this), hash, local_file);
+      time_t timestamp = query.getColumn("Last_Modif"); // Data ultima modifica
+      // Oggetto 'file'
+      File file(filename, (*this), timestamp, hash, local_file);
       string full_path_file = file.getFullPath();
-      send(s_c, full_path_file.c_str(), full_path_file.length(), 0);
+      full_path_file.append("\r\n");
+      if (send(s_c, full_path_file.c_str(), full_path_file.length(), 0) == -1) throw runtime_error("connessione persa");
+      Logger::writeToLog("File: " + filename);
       file.sendFileData(s_c);
     }
   } catch (SQLite::Exception& e) {
@@ -501,7 +505,7 @@ void Folder::sendSingleFile(int s_c) {
   buffer[len] = '\0'; // -> es. buffer: "file.txt\r\n1\0"
   string file_req = strtok(buffer, "\r\n"); // -> es. file_req = "file.txt"
   int vrs = strtol((strtok(NULL, "\r\n")), NULL, 10); // -> es. vrs = 1
-  string filename = string(buffer).substr(path.length()+1, string::npos);
+  string filename = string(buffer).substr(path.length() + 1, string::npos);
   Logger::writeToLog("Richiesto file " + filename + ", dalla versione " + to_string(vrs));
   // - Si spedisce il file richiesto
   try {
@@ -513,9 +517,11 @@ void Folder::sendSingleFile(int s_c) {
     // Lettura dati file
     string filename = query.getColumn("File_CL");		// Nome del file nel client
     string hash = query.getColumn("Hash");			// Hash del file
-    string local_file = query.getColumn("File_SRV");
-    // Oggetto 'file', senza timestamp (non serve in questo caso) e dimensione (non serve in questo caso)
-    File file(filename, (*this), hash, local_file);
+    string local_file = query.getColumn("File_SRV");  // Posizione del file sul file system
+    time_t timestamp = query.getColumn("Last_Modif"); // Data ultima modifica
+    // Oggetto 'file'
+    File file(filename, (*this), timestamp, hash, local_file);
+    Logger::writeToLog("File: " + filename);
     file.sendFileData(s_c);
   } catch (SQLite::Exception& e) {
     Logger::writeToLog("Errore DB: " + string(e.what()), ERROR);

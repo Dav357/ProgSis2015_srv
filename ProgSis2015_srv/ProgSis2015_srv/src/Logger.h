@@ -2,7 +2,7 @@
  * Logger.h
  *
  *  Created on: 20 ago 2015
- *      Author: davide
+ *      Author: Davide Locatelli
  */
 
 #ifndef LOGGER_H_

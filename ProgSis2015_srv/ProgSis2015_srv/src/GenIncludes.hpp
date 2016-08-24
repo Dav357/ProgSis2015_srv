@@ -2,7 +2,7 @@
  * GenIncludes.hpp
  *
  *  Created on: 03 ago 2015
- *      Author: davide
+ *      Author: Davide Locatelli
  */
 
 #ifndef GENINCLUDES_HPP_

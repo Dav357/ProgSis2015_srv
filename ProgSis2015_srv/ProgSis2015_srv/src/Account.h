@@ -2,7 +2,7 @@
  * LoginServ.hpp
  *
  *  Created on: 03 ago 2015
- *      Author: davide
+ *      Author: Davide Locatelli
  */
 #ifndef ACCOUNT_H_
 #define ACCOUNT_H_
