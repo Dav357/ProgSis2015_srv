@@ -27,7 +27,7 @@ Logger::Logger(string gen_log) {
   struct tm *time_info = gmtime(&(start_program_time.tv_sec));
   time_info->tm_hour += 2;
   strftime(buffer_g, BUF_LEN, "%A", time_info);
-  strftime(buffer, BUF_LEN, " %e/%m/%Y, %H:%M:%S.", time_info);
+  strftime(buffer, BUF_LEN, " %d/%m/%Y, %H:%M:%S.", time_info);
   buffer_g[0] = toupper(buffer_g[0]);
   ANSIitoUTF(buffer_g);
 
@@ -72,7 +72,7 @@ void Logger::writeToLog(std::string msg, int type, int scope) {
   }
 }
 
-// Funzione di riapertura del log, per i processi figli (altrimenti continuerebbero a scrivere sul file aperto dal padre
+// Funzione di riapertura del log, per i processi figli (altrimenti continuerebbero a scrivere sul file aperto dal padre)
 void Logger::reopenLog(string chl_log) {
 
   char buffer_g[BUF_LEN] = "";
@@ -82,11 +82,11 @@ void Logger::reopenLog(string chl_log) {
   general_log.close();
   general_log.open("./Log/" + chl_log, ofstream::out);
 
-  //Stuct time_info presa dai secondi della struct timeval
+  //Struttura time_info presa dai secondi della struct timeval
   struct tm *time_info = gmtime(&(start_program_time.tv_sec));
   time_info->tm_hour += 2;
   strftime(buffer_g, BUF_LEN, "%A", time_info);
-  strftime(buffer, BUF_LEN, " %e/%m/%Y, %H:%M:%S.", time_info);
+  strftime(buffer, BUF_LEN, " %d/%m/%Y, %H:%M:%S.", time_info);
   buffer_g[0] = toupper(buffer_g[0]);
   Logger::ANSIitoUTF(buffer_g);
 
@@ -103,7 +103,7 @@ Logger::~Logger() {
   struct tm *time_info = gmtime(&(start_program_time.tv_sec));
   time_info->tm_hour += 2;
   strftime(buffer_g, BUF_LEN, "%A", time_info);
-  strftime(buffer, BUF_LEN, " %e/%m/%Y, %H:%M:%S.", time_info);
+  strftime(buffer, BUF_LEN, " %d/%m/%Y, %H:%M:%S.", time_info);
   buffer_g[0] = toupper(buffer_g[0]);
   Logger::ANSIitoUTF(buffer_g);
   general_log << "Chiusura processo: " << buffer_g << buffer << (start_program_time.tv_usec / 1000) << endl;

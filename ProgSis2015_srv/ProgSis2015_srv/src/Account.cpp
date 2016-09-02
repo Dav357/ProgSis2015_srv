@@ -157,7 +157,7 @@ Folder Account::selectFolder(int s_c) {
 }
 
 // Funzione di login
-Account login(int s_c, char *usertable, int rec) {
+Account login(int s_c, char *usertable, const int rec) {
 
   int len, flags;
   char *buf;

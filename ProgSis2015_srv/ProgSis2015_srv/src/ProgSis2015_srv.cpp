@@ -86,17 +86,17 @@ static void initializeServerSettings(string config_file) {
 
   if (!files_folder.empty() && !DB_file.empty() && maxUsernameLen != 0 && maxUsers != 0) {
     ServerSettings s(files_folder, DB_file, maxUsers, maxUsernameLen);
-    Logger::writeToLog("Configurazione caricata correttamente", DEBUG, LOG_ONLY);
+    Logger::writeToLog("Configurazione caricata correttamente:", DEBUG, LOG_ONLY);
   } else {
-    Logger::writeToLog("Errore nella lettura della configurazione, utilizzo parametri di default", ERROR, LOG_ONLY);
+    Logger::writeToLog("Errore nella lettura della configurazione, utilizzo parametri di default:", ERROR, LOG_ONLY);
   }
   Logger::writeToLog(
-      "Cartella di salvataggio: " + ServerSettings::getFilesFolder() + ", file di database: " + ServerSettings::getDBFile() + ", limite bytes username: "
+      "Cartella per la ricezione dei file: " + ServerSettings::getFilesFolder() + ", file di database: " + ServerSettings::getDBFile() + ", limite bytes username: "
           + to_string(ServerSettings::getMaxUsernameLen()) + ", limite utenti contemporanei: " + to_string(ServerSettings::getMaxUsers()), DEBUG, LOG_ONLY);
 }
 
 // Inizializzazione della mappa dei comandi
-static void initialize() {
+static void initializeCommandMap() {
 
   m_CommandsValues["SET_FOLD"] = Select_folder;
   m_CommandsValues["CLR_FOLD"] = Clear_folder;
@@ -111,20 +111,58 @@ static void initialize() {
   m_CommandsValues["FILE_SND"] = Send_single_file;
 
   m_CommandsValues["LOGOUT__"] = Logout;
-  Logger::writeToLog("Mappa dei comandi inizializzata correttamente, numero di elementi presenti: " + to_string(m_CommandsValues.size()), DEBUG, LOG_ONLY);
+  Logger::writeToLog("Mappa dei comandi inizializzata, numero di elementi presenti: " + to_string(m_CommandsValues.size()), DEBUG, LOG_ONLY);
+}
+
+static bool initializeReceivedFolder() {
+  // Creazione cartella dei file ricevuti
+  if (mkdir(ServerSettings::getFilesFolder().c_str(), S_IRWXU | S_IRGRP | S_IWGRP | S_IROTH) == -1) {
+    // Se fallisce perché la cartella esiste già va bene altrimenti c'è un errore e il programma viene chiuso
+    if (errno == EEXIST) {
+      Logger::writeToLog("La cartella per la ricezione dei file è già esistente", DEBUG, LOG_ONLY);
+      return true;
+    } else {
+      Logger::writeToLog("Errore nella creazione della cartella per la ricezione dei file, chiusura programma", ERROR);
+      return false;
+    }
+  } else {
+    Logger::writeToLog("Cartella per la ricezione dei file creata correttamente", DEBUG, LOG_ONLY);
+    return true;
+  }
+}
+
+static bool checkDB() {
+  try {
+    SQLite::Database db(ServerSettings::getDBFile(), SQLITE_OPEN_READONLY);
+    if (((int)db.execAndGet("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = 'users';")) == 1) {
+      Logger::writeToLog("Il database è consistente (contiene la tabella utenti)", DEBUG, LOG_ONLY);
+      return true;
+    } else {
+      Logger::writeToLog("Il database non è consistente (tabella utenti non trovata), chiusura programma", ERROR);
+      return false;
+    }
+  } catch (SQLite::Exception& e) {
+    Logger::writeToLog("Errore nel database: " + string(e.what()), ERROR);
+    return false;
+  }
 }
 
 int main(int argc, char** argv) {
 
-  int port = 0, pid/*, optval = 1*/;
+  int port = 0, pid, optval = 1;
   bool manag = false;
   string config_file_name;
-  //socklen_t optlen = sizeof(optval);
+  socklen_t optlen = sizeof(optval);
   struct sockaddr_in saddr, claddr;
   socklen_t claddr_len = sizeof(struct sockaddr_in);
   int s, s_c; //Socket
   ServerSettings base_set;
 
+// Creazione cartella dei log
+  if (mkdir("Log", S_IRWXU | S_IRGRP | S_IWGRP | S_IROTH) == -1) {
+    // Se fallisce perché la cartella esiste già va bene altrimenti c'è un errore
+    if (errno != EEXIST) cerr << "❌  Errore nella creazione della cartella dei log, nessun file di log verrà scritto!" << endl;
+  }
   Logger log("[" + to_string(getpid()) + "] debug.log");
 
   if (argc != 5 && argc != 4) {
@@ -155,16 +193,23 @@ int main(int argc, char** argv) {
   }
   if (manag) {
     serverManagement();
+    return (EXIT_SUCCESS);
   }
 
   /* INIZIALIZZAZIONI */
-  // Inizializzazione tabella comandi
-  initialize();
-  // Inizializzazione server da file ricevuto
+// Inizializzazione tabella comandi
+  initializeCommandMap();
+// Inizializzazione server da file ricevuto
   initializeServerSettings(config_file_name);
+// Creazione cartella dei file ricevuti
+  if (!initializeReceivedFolder()) return (EXIT_FAILURE);
   /* FINE INIZIALIZZAZIONI */
 
-  // Creazione socket
+// Controllo consistenza database
+  if (!checkDB()) return (EXIT_FAILURE);
+
+  /* SOCKET */
+// Creazione socket
   if ((s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
     Logger::writeToLog("Errore nella creazione del socket, chiusura programma", ERROR);
     return (EXIT_FAILURE);
@@ -174,14 +219,14 @@ int main(int argc, char** argv) {
   saddr.sin_addr.s_addr = htonl(INADDR_ANY);
   saddr.sin_family = AF_INET;
   saddr.sin_port = htons(port);
-  // Impostazione di SO_KEEPALIVE
-//  if (setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen) < 0) {
-//    Logger::writeToLog("Errore nell'impostazione delle opzioni del socket, chiusura programma", ERROR);
-//    close(s);
-//    return (EXIT_FAILURE);
-//  }
-//  Logger::writeToLog("Impostazione SO_KEEPALIVE del socket applicata correttamente", DEBUG, LOG_ONLY);
-  // Bind del socket e listen
+// Impostazione di SO_KEEPALIVE
+  if (setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen) < 0) {
+    Logger::writeToLog("Errore nell'impostazione delle opzioni del socket, chiusura programma", ERROR);
+    close(s);
+    return (EXIT_FAILURE);
+  }
+  Logger::writeToLog("Impostazione SO_KEEPALIVE del socket applicata correttamente", DEBUG, LOG_ONLY);
+// Bind del socket e listen
   if (bind(s, (struct sockaddr*) &saddr, sizeof(saddr)) == -1) {
     Logger::writeToLog("Errore nel binding del socket, chiusura programma", ERROR);
     close(s);
@@ -194,29 +239,35 @@ int main(int argc, char** argv) {
     return (EXIT_FAILURE);
   }
   Logger::writeToLog("Socket posto correttamente in ascolto", DEBUG, LOG_ONLY);
-  // Area mappata:
-  //   MMAP_SIZE -> MMAP_LINE_SIZE (Lunghezza massima nome utente, in byte) x MMAP_MAX_USER (Possibili utenti connessi contemporaneamente OvK)
-  // + byte necessari per allocare il semaforo (sizeof(sem_t))
+
+  /* AREA DI MEMORIA CONDIVISA */
+//   MMAP_SIZE -> MMAP_LINE_SIZE (Lunghezza massima nome utente, in byte) x MMAP_MAX_USER (Possibili utenti connessi contemporaneamente)
+//   + byte necessari per allocare il semaforo (sizeof(sem_t))
   if ((sem_usertable = (sem_t*) mmap(NULL, sizeof(sem_t) + ServerSettings::getMMapSize(), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0)) == MAP_FAILED) {
     Logger::writeToLog("Errore nella creazione dell'area di memoria condivisa, chiusura programma", ERROR);
     return (EXIT_FAILURE);
   }
   usertable = (char*) sem_usertable + sizeof(sem_t);
-  Logger::writeToLog("Area di memoria condivisa (tabella utenti e semaforo) creata correttamente, dimensione totale: " + to_string(sizeof(sem_t) + ServerSettings::getMMapSize()), DEBUG, LOG_ONLY);
-  // Inizializzazione semaforo, non locale al processo, 1 accesso per volta
+  Logger::writeToLog("Area di memoria condivisa (tabella utenti e semaforo) creata correttamente, dimensione totale: " + to_string(sizeof(sem_t) + ServerSettings::getMMapSize()) + " Bytes", DEBUG,
+      LOG_ONLY);
+// Inizializzazione semaforo, non locale al processo, 1 accesso per volta
   if ((sem_init(sem_usertable, 1, 1)) == -1) {
-    Logger::writeToLog("Errore nell'inizializzazione del semaforo", ERROR);
+    Logger::writeToLog("Errore nell'inizializzazione del semaforo, chiusura programma", ERROR);
+    return (EXIT_FAILURE);
   }
   Logger::writeToLog("Semaforo inizializzato correttamente", DEBUG, LOG_ONLY);
 
+  /* SEGNALI */
+// Istanziamento gestore del segnale di terminazione dei processi figli
   if ((signal(SIGCHLD, childHandler)) == SIG_ERR) {
     Logger::writeToLog("Errore nell'istanziamento del gestore del segnale di terminazione dei processi figli", ERROR);
   }
   Logger::writeToLog("Gestore del segnale di terminazione dei processi figli istanziato correttamente", DEBUG, LOG_ONLY);
+// Istanziamento gestore del segnale di terminazione
   if (((signal(SIGINT, termHandler)) == SIG_ERR) || (signal(SIGTERM, termHandler) == SIG_ERR)) {
-    Logger::writeToLog("Errore nell'istanziamento del gestore del segnale di terminazione del processo principale", ERROR);
+    Logger::writeToLog("Errore nell'istanziamento del gestore del segnale di terminazione", ERROR);
   }
-  Logger::writeToLog("Gestore del segnale di terminazione del processo principale istanziato correttamente", DEBUG, LOG_ONLY);
+  Logger::writeToLog("Gestore del segnale di terminazione istanziato correttamente", DEBUG, LOG_ONLY);
 
   try {
     for (;;) {
@@ -365,33 +416,41 @@ void sendCommand(int s_c, const char *command) {
 // Aggiunta di un utente alla lista degli utenti attualmente connessi
 bool addToUsertable(string user) {
 
-  // Aggiungere un utente connesso all'elenco degli utenti:
+// Aggiungere un utente connesso all'elenco degli utenti:
   string line;
-  // Si scorre l'area di memoria una linea per volta (numero di bytes pari a MMAP_LINE_SIZE)
+  bool ok = false;
+// Si scorre l'area di memoria una linea per volta (numero di bytes pari a MMAP_LINE_SIZE)
   sem_wait(sem_usertable);
-  for (int i = 0; i < ServerSettings::getMMapSize(); i += ServerSettings::getMMapMaxLineSize()) {
-    // Lettura fino al '\0', al massimo MMAP_LINE_SIZE-1 bytes (lunghezza username limitata a MMAP_LINE_SIZE-1 bytes)
-    line.assign((usertable + i));
-    if (line.empty()) {
-      // Se la riga è vuota -> si inserisce il nome dell'utente corrente
-      sprintf(usertable + i, "%s", user.c_str());
-      Logger::writeToLog("Elenco di utenti connessi aggiornato, utente " + user + " aggiunto");
-      sem_post(sem_usertable);
-      return true;
-    } else if (!line.compare(user)) {
-      // Se l'utente nella riga corrisponde a quello che sta tentando il login
-      Logger::writeToLog("L'account risulta già connesso", ERROR);
-      sem_post(sem_usertable);
-      return false;
+  try {
+    for (int i = 0; i < ServerSettings::getMMapSize(); i += ServerSettings::getMMapMaxLineSize()) {
+      // Lettura fino al '\0', al massimo MMAP_LINE_SIZE-1 bytes (lunghezza username limitata a MMAP_LINE_SIZE-1 bytes)
+      line.assign((usertable + i));
+      if (line.empty()) {
+        // Se la riga è vuota -> si inserisce il nome dell'utente corrente
+        sprintf(usertable + i, "%s", user.c_str());
+        ok = true;
+        Logger::writeToLog("Elenco di utenti connessi aggiornato, utente " + user + " aggiunto");
+        sem_post(sem_usertable);
+        return ok;
+      } else if (line.compare(user) == 0) {
+        // Se l'utente nella riga corrisponde a quello che sta tentando il login
+        Logger::writeToLog("L'account risulta già connesso", ERROR);
+        sem_post(sem_usertable);
+        return ok;
+      }
+      // La riga non è vuota e l'utente nella riga corrente NON corrisponde a quello che sta tentando di fare login
     }
-    // La riga non è vuota e l'utente nella riga corrente NON corrisponde a quello che sta tentando di fare login
+    // Se si è raggiunta la fine (spazio esaurito per nuovi utenti), si ritorna false
+    Logger::writeToLog("È stato raggiunto il numero massimo di utenti connessi", ERROR);
+    sem_post(sem_usertable);
+    return ok;
+  } catch (exception& e) {
+    Logger::writeToLog("Eccezione nell'aggiunta di un utente alla tabella utenti: " + string(e.what()), ERROR);
+    sem_post(sem_usertable);
+    return ok;
   }
-  // Se si è raggiunta la fine (spazio esaurito per nuovi utenti), si ritorna false
-  Logger::writeToLog("È stato raggiunto il numero massimo di utenti connessi", ERROR);
-  sem_post(sem_usertable);
-  return false;
-
 }
+
 // Rimozione di un utente dalla lista degli utenti attualmente connessi
 void removeFromUsertable(string user) {
 
@@ -401,33 +460,39 @@ void removeFromUsertable(string user) {
   char mod = 0;
 // Si scorre l'elenco degli utenti
   sem_wait(sem_usertable);
-  for (int i = 0; i < ServerSettings::getMMapSize(); i += ServerSettings::getMMapMaxLineSize()) {
-    // Si legge la riga corrente...
-    line.assign(usertable + i);
-    // ...e la si azzera
-    usertable[i] = '\0';
-    if (line.empty()) {
-      // Se la linea corrente è vuota: si termina il ciclo
-      break;
-    } else if (!line.compare(user)) {
-      //  Se la linea attuale contiene l'utente da eliminare, si prosegue con l'iterazione successiva
-      mod = 1;
-      continue;
+  try {
+    for (int i = 0; i < ServerSettings::getMMapSize(); i += ServerSettings::getMMapMaxLineSize()) {
+      // Si legge la riga corrente...
+      line.assign(usertable + i);
+      // ...e la si azzera
+      usertable[i] = '\0';
+      if (line.empty()) {
+        // Se la linea corrente è vuota: si termina il ciclo
+        break;
+      } else if (!line.compare(user)) {
+        //  Se la linea attuale contiene l'utente da eliminare, si prosegue con l'iterazione successiva
+        mod = 1;
+        continue;
+      }
+      // Altrimenti si salva l'utente corrente nel vettore di stringhe
+      users.push_back(line);
     }
-    // Altrimenti si salva l'utente corrente nel vettore di stringhe
-    users.push_back(line);
+    // - Si ripopola l'area mappata con il nuovo elenco di nomi utente
+    int i = 0;
+    for (string s : users) {
+      sprintf(usertable + i, "%s", s.c_str());
+      i += ServerSettings::getMMapMaxLineSize();
+    }
+    sem_post(sem_usertable);
+    if (mod == 1)
+      Logger::writeToLog("Elenco di utenti connessi aggiornato, utente " + user + " rimosso");
+    else
+      Logger::writeToLog("Nessuna modifica all'elenco di utenti connessi", DEBUG, LOG_ONLY);
+  } catch (exception& e) {
+    // Terminazione di tutti i processi del gruppo (padre e figli) a seguito di eccezione nella gestione della tabella utenti
+    Logger::writeToLog("Eccezione nella rimozione dell'utente alla tabella utenti: " + string(e.what()), ERROR);
+    kill(0, SIGTERM);
   }
-// - Si ripopola l'area mappata con il nuovo elenco di nomi utente
-  int i = 0;
-  for (string s : users) {
-    sprintf(usertable + i, "%s", user.c_str());
-    i += ServerSettings::getMMapMaxLineSize();
-  }
-  sem_post(sem_usertable);
-  if (mod == 1)
-    Logger::writeToLog("Elenco di utenti connessi aggiornato, utente " + user + " rimosso");
-  else
-    Logger::writeToLog("Nessuna modifica all'elenco di utenti connessi", DEBUG, LOG_ONLY);
 }
 /* FINE GESTIONE USERTABLE */
 
@@ -495,16 +560,16 @@ void serverManagement() {
         break;
     }
   }
-  exit(EXIT_SUCCESS);
+  return;
 }
 // Scrittura file di configurazione
 void createConfigFile() {
-  // Si richiede:
-  // - Nome file
-  // -- Cartella file ricevuti
-  // -- Nome database
-  // -- Lunghezza massima nome utente
-  // -- Numero massimo utenti connessi contemporaneamente
+// Si richiede:
+// - Nome file
+// -- Cartella file ricevuti
+// -- Nome database
+// -- Lunghezza massima nome utente
+// -- Numero massimo utenti connessi contemporaneamente
   string buffer;
   cout << "Nome del file da creare? ";
   cin.clear();
